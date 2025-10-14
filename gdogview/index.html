@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDOG Balance Checker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        textarea, button {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        textarea {
+            background-color: #2d2d2d;
+            border: 1px solid #4b4b4b;
+            color: #ffffff;
+            resize: vertical;
+        }
+        button {
+            background-color: #0068FF;
+            color: #ffffff;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0052cc;
+        }
+        button:disabled {
+            background-color: #4b4b4b;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #ff4d4d;
+        }
+        .success {
+            color: #18E5A0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center mb-6">GDOG Balance Checker</h1>
+        <p class="text-center text-gray-400 mb-4">Enter wallet addresses (one per line)</p>
+        <textarea id="addresses" rows="5" placeholder="0xA037355662d34D9B57dE209E22544a4862F5A30c&#10;0xAnotherAddress"></textarea>
+        <button id="checkButton" class="mt-4">Check Balances</button>
+        <div id="result" class="text-sm"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
+    <script>
+        const GDOG_ADDRESS = '0xA037355662d34D9B57dE209E22544a4862F5A30c';
+        const RPC_URL = 'https://gatelayer-rpc.gatenode.cc';
+
+        const erc20Abi = [
+            {
+                "constant": true,
+                "inputs": [{"name": "_owner", "type": "address"}],
+                "name": "balanceOf",
+                "outputs": [{"name": "balance", "type": "uint256"}],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+        const web3 = new Web3(RPC_URL);
+        const gdogContract = new web3.eth.Contract(erc20Abi, GDOG_ADDRESS);
+
+        async function checkBalances() {
+            const checkButton = document.getElementById('checkButton');
+            const resultDiv = document.getElementById('result');
+            const addressesInput = document.getElementById('addresses').value.trim();
+            const addresses = addressesInput.split('\n').map(addr => addr.trim()).filter(addr => addr);
+
+            if (addresses.length === 0) {
+                resultDiv.innerHTML = '<p class="error">Please enter at least one wallet address.</p>';
+                return;
+            }
+
+            checkButton.disabled = true;
+            checkButton.innerText = 'Checking...';
+            resultDiv.innerHTML = '<p>Fetching balances...</p>';
+
+            try {
+                let output = '';
+                for (const address of addresses) {
+                    if (!web3.utils.isAddress(address)) {
+                        output += `<p class="error">${address}: Invalid address</p>`;
+                        continue;
+                    }
+                    try {
+                        const balance = await gdogContract.methods.balanceOf(address).call();
+                        const balanceFormatted = Number(web3.utils.fromWei(balance, 'ether')).toFixed(4);
+                        output += `<p class="success">${address}: ${balanceFormatted} GDOG</p>`;
+                    } catch (error) {
+                        output += `<p class="error">${address}: Error fetching balance - ${error.message}</p>`;
+                    }
+                }
+                resultDiv.innerHTML = output;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            } finally {
+                checkButton.disabled = false;
+                checkButton.innerText = 'Check Balances';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('checkButton').addEventListener('click', checkBalances);
+        });
+    </script>
+</body>
+</html>
