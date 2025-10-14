@@ -69,6 +69,7 @@
     <script>
         const GDOG_ADDRESS = '0xA037355662d34D9B57dE209E22544a4862F5A30c';
         const RPC_URL = 'https://gatelayer-rpc.gatenode.cc';
+        const BATCH_SIZE = 5;
 
         const erc20Abi = [
             {
@@ -101,18 +102,25 @@
 
             try {
                 let output = '';
-                for (const address of addresses) {
-                    if (!web3.utils.isAddress(address)) {
-                        output += `<p class="error">${address}: Invalid address</p>`;
-                        continue;
-                    }
-                    try {
-                        const balance = await gdogContract.methods.balanceOf(address).call();
-                        const balanceFormatted = Number(web3.utils.fromWei(balance, 'ether')).toFixed(4);
-                        output += `<p class="success">${address}: ${balanceFormatted} GDOG</p>`;
-                    } catch (error) {
-                        output += `<p class="error">${address}: Error fetching balance - ${error.message}</p>`;
-                    }
+                // Process addresses in batches of 5
+                for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+                    const batch = addresses.slice(i, i + BATCH_SIZE);
+                    const batchPromises = batch.map(async (address) => {
+                        if (!web3.utils.isAddress(address)) {
+                            return `<p class="error">${address}: Invalid address</p>`;
+                        }
+                        try {
+                            const balance = await gdogContract.methods.balanceOf(address).call();
+                            const balanceFormatted = Number(web3.utils.fromWei(balance, 'ether')).toFixed(4);
+                            return `<p class="success">${address}: ${balanceFormatted} GDOG</p>`;
+                        } catch (error) {
+                            return `<p class="error">${address}: Error fetching balance - ${error.message}</p>`;
+                        }
+                    });
+                    const batchResults = await Promise.all(batchPromises);
+                    output += batchResults.join('');
+                    // Update UI after each batch to show progress
+                    resultDiv.innerHTML = output + (i + BATCH_SIZE < addresses.length ? '<p>Fetching more balances...</p>' : '');
                 }
                 resultDiv.innerHTML = output;
             } catch (error) {
