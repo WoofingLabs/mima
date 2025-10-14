@@ -54,6 +54,10 @@
         .success {
             color: #18E5A0;
         }
+        .total {
+            font-weight: 700;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -68,7 +72,9 @@
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
     <script>
         const GDOG_ADDRESS = '0xA037355662d34D9B57dE209E22544a4862F5A30c';
-        const RPC_URL = 'https://gatelayer-rpc.gatenode.cc';
+        const RPC_URLS = [
+            'https://gatelayer-mainnet.gatenode.cc',
+        ];
         const BATCH_SIZE = 5;
 
         const erc20Abi = [
@@ -82,8 +88,22 @@
             }
         ];
 
-        const web3 = new Web3(RPC_URL);
-        const gdogContract = new web3.eth.Contract(erc20Abi, GDOG_ADDRESS);
+        let web3, gdogContract;
+
+        async function initializeWeb3() {
+            for (const rpcUrl of RPC_URLS) {
+                try {
+                    web3 = new Web3(rpcUrl);
+                    gdogContract = new web3.eth.Contract(erc20Abi, GDOG_ADDRESS);
+                    // Test connection by calling a simple method
+                    await gdogContract.methods.balanceOf('0x0000000000000000000000000000000000000000').call();
+                    return true;
+                } catch (error) {
+                    console.warn(`RPC ${rpcUrl} failed: ${error.message}`);
+                }
+            }
+            return false;
+        }
 
         async function checkBalances() {
             const checkButton = document.getElementById('checkButton');
@@ -100,8 +120,19 @@
             checkButton.innerText = 'Checking...';
             resultDiv.innerHTML = '<p>Fetching balances...</p>';
 
+            // Initialize Web3 with fallback RPCs
+            const initialized = await initializeWeb3();
+            if (!initialized) {
+                resultDiv.innerHTML = '<p class="error">Error: All RPC endpoints failed. Please try again later.</p>';
+                checkButton.disabled = false;
+                checkButton.innerText = 'Check Balances';
+                return;
+            }
+
             try {
                 let output = '';
+                let totalBalance = 0;
+
                 // Process addresses in batches of 5
                 for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
                     const batch = addresses.slice(i, i + BATCH_SIZE);
@@ -112,6 +143,7 @@
                         try {
                             const balance = await gdogContract.methods.balanceOf(address).call();
                             const balanceFormatted = Number(web3.utils.fromWei(balance, 'ether')).toFixed(4);
+                            totalBalance += Number(balanceFormatted);
                             return `<p class="success">${address}: ${balanceFormatted} GDOG</p>`;
                         } catch (error) {
                             return `<p class="error">${address}: Error fetching balance - ${error.message}</p>`;
@@ -119,9 +151,12 @@
                     });
                     const batchResults = await Promise.all(batchPromises);
                     output += batchResults.join('');
-                    // Update UI after each batch to show progress
+                    // Update UI after each batch
                     resultDiv.innerHTML = output + (i + BATCH_SIZE < addresses.length ? '<p>Fetching more balances...</p>' : '');
                 }
+
+                // Add total balance
+                output += `<p class="total">Total GDOG Balance: ${totalBalance.toFixed(4)} GDOG</p>`;
                 resultDiv.innerHTML = output;
             } catch (error) {
                 resultDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
