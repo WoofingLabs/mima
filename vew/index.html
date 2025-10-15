@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MIMA Token Migration Query</title>
+    <title>MIMA Claim Query</title>
     <link rel="icon" type="image/png" href="https://www.woofswap.finance/image/tokens/mima.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
@@ -58,7 +58,7 @@
                 <div class="w-10 h-10 rounded-full overflow-hidden">
                     <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA Logo" class="w-full h-full object-cover">
                 </div>
-                <span class="font-display text-3xl text-primary text-shadow-glow">MIMA Token Migration Query</span>
+                <span class="font-display text-3xl text-primary text-shadow-glow">MIMA Claim Query</span>
             </div>
             <button id="menuToggle" class="md:hidden text-2xl text-primary">
                 <i class="fa fa-bars"></i>
@@ -66,12 +66,12 @@
         </div>
         <div id="mobileMenu" class="md:hidden bg-dark/95 absolute w-full top-full py-4 px-4 hidden">
             <div class="flex flex-col space-y-4">
-                <a href="#migration" class="hover:text-primary transition-colors py-2 text-white">Query Records</a>
+                <a href="#query" class="hover:text-primary transition-colors py-2 text-white">Claim Query</a>
             </div>
         </div>
     </header>
 
-    <section id="migration" class="min-h-screen pt-24 pb-16 bg-grid relative overflow-hidden flex items-center justify-center">
+    <section id="query" class="min-h-screen pt-24 pb-16 bg-grid relative overflow-hidden flex items-center justify-center">
         <div class="absolute inset-0 bg-gradient-to-b from-primary/10 to-dark pointer-events-none"></div>
         <div class="absolute top-0 left-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
         <div class="absolute bottom-0 right-0 w-80 h-80 bg-secondary/10 rounded-full blur-3xl"></div>
@@ -79,24 +79,15 @@
             <div class="w-48 h-48 mx-auto mb-8 animate-float">
                 <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA Logo" class="w-full h-full object-cover rounded-full border-4 border-secondary/50 glow-border">
             </div>
-            <h1 class="font-display text-5xl md:text-7xl mb-6 text-primary text-shadow-glow">MIMA Token Migration Query</h1>
+            <h1 class="font-display text-5xl md:text-7xl mb-6 text-primary text-shadow-glow">MIMA Claim Query</h1>
             <p class="text-xl md:text-2xl text-light-gray max-w-3xl mx-auto mb-10">
-                View the claim status for MIMA token migration (75% of old MIMA deposits).
+                Query MIMA token migration claim records starting from ID 1 until no more records are found.
             </p>
-            <div class="bg-dark/50 p-6 rounded-lg border border-primary/30 max-w-4xl mx-auto mb-8">
+            <div class="bg-dark/50 p-6 rounded-lg border border-primary/30 max-w-2xl mx-auto mb-8">
                 <div class="flex flex-col space-y-4">
-                    <p id="networkStatus" class="text-light-gray text-sm">Connecting to Gate Layer...</p>
-                    <div class="flex items-center bg-dark/80 p-3 rounded-lg border border-primary/20">
-                        <i class="fa fa-link text-accent mr-3"></i>
-                        <span class="font-mono text-sm text-white truncate">0x6796D46FB31552E6F089421518646bfaC5eCf661</span>
-                        <button class="ml-3 text-light-gray hover:text-secondary transition-colors" onclick="copyContract()">
-                            <i class="fa fa-copy"></i>
-                        </button>
-                    </div>
-                    <div class="bg-dark/80 p-3 rounded-lg border border-primary/20">
-                        <p id="recordStatus" class="text-light-gray text-sm">Loading records...</p>
-                        <div id="recordList" class="mt-4 text-left"></div>
-                    </div>
+                    <button id="queryButton" class="px-6 py-3 bg-primary text-white rounded-full font-medium hover:bg-primary/80 transition-all">Start Query</button>
+                    <p id="queryStatus" class="text-light-gray text-sm">Click to start querying...</p>
+                    <div id="queryResults" class="bg-dark/80 p-3 rounded-lg border border-primary/20 max-h-96 overflow-y-auto"></div>
                     <div class="mt-4">
                         <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA" class="w-16 h-16 mx-auto animate-float">
                     </div>
@@ -113,153 +104,82 @@
 
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
     <script>
-        const CONTRACT_ADDRESS = '0x6796D46FB31552E6F089421518646bfaC5eCf661';
-
+        const CONTRACT_ADDRESS = '0x4FF02E12B616453e1534F59eB044a81ADfFe7DdF';
         const contractAbi = [
-            {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getClaimableAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
+            {"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getClaimRecord","outputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"claimAmount","type":"uint256"},{"internalType":"uint256","name":"recordId","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"getClaimRecords","outputs":[{"components":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"claimAmount","type":"uint256"},{"internalType":"uint256","name":"id","type":"uint256"}],"internalType":"struct MIMAClaimRegistry.ClaimInfo[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasJoined","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"addressToId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
         ];
 
         const chains = {
             GateLayer: {
                 chainId: 10088,
-                chainName: 'Gate Layer',
-                rpcUrl: 'https://gatelayer-rpc.gatenode.cc',
-                blockExplorer: 'https://www.gatescan.org/gatelayer/',
-                nativeCurrency: { name: 'GT', symbol: 'GT', decimals: 18 }
+                rpcUrl: 'https://gatelayer-rpc.gatenode.cc'
             }
         };
 
         let web3, migrationContract;
 
+        async function initializeWeb3() {
+            web3 = new Web3(chains.GateLayer.rpcUrl);
+            migrationContract = new web3.eth.Contract(contractAbi, CONTRACT_ADDRESS);
+        }
+
         async function delay(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        async function retryContractCall(fn, maxRetries = 3, delayMs = 500) {
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                try {
-                    return await fn();
-                } catch (error) {
-                    if (attempt === maxRetries) return null;
-                    await delay(delayMs);
-                }
-            }
-        }
+        async function queryClaimRecords() {
+            const queryButton = document.getElementById('queryButton');
+            const queryStatus = document.getElementById('queryStatus');
+            const queryResults = document.getElementById('queryResults');
+            queryButton.disabled = true;
+            queryButton.innerHTML = 'Querying... <i class="fa fa-spinner fa-spin ml-2"></i>';
+            queryStatus.innerText = 'Querying claim records...';
+            queryResults.innerHTML = '';
 
-        async function initializeWeb3() {
             try {
-                web3 = new Web3(chains.GateLayer.rpcUrl);
-                migrationContract = new web3.eth.Contract(contractAbi, CONTRACT_ADDRESS);
-                document.getElementById('networkStatus').innerText = 'Connected to Gate Layer (ID: 10088)';
-                await loadRecords();
-            } catch (error) {
-                document.getElementById('networkStatus').innerText = 'Failed to connect to Gate Layer: ' + (error.message || 'Unknown error');
-                document.getElementById('recordStatus').innerText = 'Failed to load records';
-            }
-        }
-
-        async function loadRecords() {
-            const status = document.getElementById('networkStatus');
-            const recordStatus = document.getElementById('recordStatus');
-            const recordList = document.getElementById('recordList');
-            try {
-                status.innerText = 'Querying records...';
-                recordStatus.innerText = 'Loading records...';
-                
-                // 示例地址列表（需替换为实际数据源或事件日志）
-                const addresses = [
-                    '0x1234567890123456789012345678901234567890',
-                    '0xabcdef1234567890abcdef1234567890abcdef12',
-                    // 添加更多地址，或通过事件获取
-                ];
-
-                let html = '<table class="w-full text-sm text-light-gray"><thead><tr><th class="text-left py-2">ID</th><th class="text-left py-2">Address</th><th class="text-left py-2">Status</th><th class="text-left py-2">Claimable Amount</th></tr></thead><tbody>';
+                await initializeWeb3();
                 let id = 1;
-                let continueQuery = true;
-
-                while (continueQuery && id <= addresses.length) {
-                    const address = addresses[id - 1];
-                    if (!web3.utils.isAddress(address)) {
-                        html += `<tr><td class="py-2">${id}</td><td class="py-2 font-mono">Invalid Address</td><td class="py-2">N/A</td><td class="py-2">N/A</td></tr>`;
-                        id++;
-                        await delay(1000);
-                        continue;
-                    }
-
-                    let hasClaimed = false;
-                    let claimableAmount = '0';
+                while (true) {
                     try {
-                        hasClaimed = await retryContractCall(() => migrationContract.methods.hasClaimed(address).call());
-                        if (hasClaimed === null) throw new Error('Query failed');
+                        const record = await migrationContract.methods.getClaimRecord(id).call();
+                        const claimAmountFormatted = Number(web3.utils.fromWei(record.claimAmount, 'ether')).toFixed(4);
+                        const isJoined = await migrationContract.methods.hasJoined(record.user).call();
+                        const statusColor = isJoined ? 'text-red-500' : 'text-green-500';
+                        queryResults.innerHTML += `
+                            <div class="p-2 border-b border-primary/20">
+                                <p class="text-sm">
+                                    <span class="font-mono">ID: ${record.recordId}</span><br>
+                                    <span class="font-mono">Address: ${record.user.slice(0, 6)}...${record.user.slice(-4)}</span><br>
+                                    <span class="${statusColor}">Joined: ${isJoined ? 'Yes' : 'No'}</span><br>
+                                    <span>Claim Amount: ${claimAmountFormatted} MIMA</span>
+                                </p>
+                            </div>
+                        `;
+                        await delay(1000); // 1秒间隔，避免网络拥堵
+                        id++;
                     } catch (error) {
-                        hasClaimed = false;
-                    }
-                    await delay(500);
-
-                    if (!hasClaimed) {
-                        try {
-                            claimableAmount = await retryContractCall(() => migrationContract.methods.getClaimableAmount(address).call());
-                            if (claimableAmount === null) throw new Error('Query failed');
-                        } catch (error) {
-                            claimableAmount = '0';
+                        if (error.message.includes('Invalid ID')) {
+                            queryStatus.innerText = `Query completed: ${id - 1} records found`;
+                            break;
+                        } else {
+                            queryStatus.innerText = `Error at ID ${id}: ${error.message}`;
+                            break;
                         }
                     }
-
-                    const claimableAmountFormatted = Number(web3.utils.fromWei(claimableAmount, 'ether')).toFixed(4);
-                    const addressDisplay = `${address.slice(0, 6)}...${address.slice(-4)}`;
-                    html += `<tr>
-                        <td class="py-2">${id}</td>
-                        <td class="py-2 font-mono ${hasClaimed ? 'text-red-500' : 'text-white'}">${addressDisplay}</td>
-                        <td class="py-2">${hasClaimed ? 'Claimed' : 'Not Claimed'}</td>
-                        <td class="py-2">${hasClaimed ? 'N/A' : claimableAmountFormatted}</td>
-                    </tr>`;
-
-                    recordList.innerHTML = html;
-                    if (!hasClaimed && claimableAmount === '0') {
-                        continueQuery = false; // 停止条件：未领取且可领取数量为0
-                    }
-
-                    id++;
-                    await delay(1000); // 每秒查询一个
                 }
-
-                html += '</tbody></table>';
-                recordList.innerHTML = html;
-                recordStatus.innerText = continueQuery ? 'Reached address list end' : 'No more records found';
-                status.innerText = 'Records loaded';
             } catch (error) {
-                let errorMessage = error.message || 'Unknown error';
-                if (errorMessage.includes('execution reverted')) {
-                    if (errorMessage.includes('No deposits')) {
-                        errorMessage = 'No deposits found for this address';
-                    } else {
-                        errorMessage = 'Query failed, please check contract';
-                    }
-                }
-                recordStatus.innerText = `Failed to load records: ${errorMessage}`;
-                status.innerText = 'Query failed';
+                queryStatus.innerText = `Failed to initialize: ${error.message}`;
+            } finally {
+                queryButton.disabled = false;
+                queryButton.innerHTML = 'Start Query';
             }
-        }
-
-        function copyContract() {
-            navigator.clipboard.writeText(CONTRACT_ADDRESS).then(() => {
-                const notification = document.createElement('div');
-                notification.className = 'fixed bottom-4 right-4 bg-primary text-white px-4 py-2 rounded-lg shadow-lg z-50';
-                notification.textContent = 'Contract address copied!';
-                document.body.appendChild(notification);
-                setTimeout(() => {
-                    notification.style.opacity = '0';
-                    notification.style.transition = 'opacity 0.3s';
-                    setTimeout(() => {
-                        document.body.removeChild(notification);
-                    }, 300);
-                }, 2000);
-            });
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            initializeWeb3();
+            document.getElementById('queryButton').addEventListener('click', queryClaimRecords);
 
             const menuToggle = document.getElementById('menuToggle');
             const mobileMenu = document.getElementById('mobileMenu');
