@@ -63,9 +63,9 @@
 <body>
     <div class="container">
         <h1 class="text-3xl font-bold text-center mb-6">MIMA Deposits Checker</h1>
-        <p class="text-center text-gray-400 mb-4">Enter wallet addresses (one per line)</p>
+        <p class="text-center text-gray-400 mb-4">请输入钱包地址（每行一个）</p>
         <textarea id="addresses" rows="5" placeholder="0xA037355662d34D9B57dE209E22544a4862F5A30c&#10;0xAnotherAddress"></textarea>
-        <button id="checkButton" class="mt-4">Check Deposits</button>
+        <button id="checkButton" class="mt-4">查询存款</button>
         <div id="result" class="text-sm"></div>
     </div>
 
@@ -75,7 +75,10 @@
         const RPC_URLS = [
             'https://gatelayer-mainnet.gatenode.cc/'
         ];
-        const BATCH_SIZE = 5;
+        const BATCH_SIZE = 3; // 减小批次大小以降低速率限制风险
+        const MAX_RETRIES = 5; // 最大重试次数
+        const RETRY_DELAY = 2000; // 重试间隔（毫秒）
+        const REQUEST_DELAY = 1000; // 每批请求之间的延迟（毫秒）
 
         const mimaAbi = [
             {
@@ -88,21 +91,52 @@
             }
         ];
 
-        let web3, mimaContract;
+        let web3, mimaContract, currentRpcIndex = 0;
 
         async function initializeWeb3() {
-            for (const rpcUrl of RPC_URLS) {
+            while (currentRpcIndex < RPC_URLS.length) {
+                const rpcUrl = RPC_URLS[currentRpcIndex];
                 try {
                     web3 = new Web3(rpcUrl);
                     mimaContract = new web3.eth.Contract(mimaAbi, MIMA_ADDRESS);
-                    // 测试连接
                     await mimaContract.methods.deposits('0x0000000000000000000000000000000000000000').call();
                     return true;
                 } catch (error) {
                     console.warn(`RPC ${rpcUrl} failed: ${error.message}`);
+                    currentRpcIndex++;
                 }
             }
             return false;
+        }
+
+        async function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function fetchDeposit(address, retries = 0) {
+            if (!web3.utils.isAddress(address)) {
+                return { address, result: `<p class="error">${address}: 无效地址</p>`, success: false };
+            }
+            try {
+                const deposit = await mimaContract.methods.deposits(address).call();
+                const depositFormatted = Number(web3.utils.fromWei(deposit, 'ether')).toFixed(4);
+                return { address, result: `<p class="success">${address}: ${depositFormatted} MIMA</p>`, success: true, balance: Number(depositFormatted) };
+            } catch (error) {
+                if (retries < MAX_RETRIES && error.message.includes('Rate limit exceeded')) {
+                    await delay(RETRY_DELAY);
+                    if (retries === Math.floor(MAX_RETRIES / 2)) {
+                        currentRpcIndex++;
+                        if (currentRpcIndex < RPC_URLS.length) {
+                            const initialized = await initializeWeb3();
+                            if (!initialized) {
+                                return { address, result: `<p class="error">${address}: 所有RPC端点均失败</p>`, success: false };
+                            }
+                        }
+                    }
+                    return fetchDeposit(address, retries + 1);
+                }
+                return { address, result: `<p class="error">${address}: 获取存款余额失败 - ${error.message}</p>`, success: false };
+            }
         }
 
         async function checkDeposits() {
@@ -132,31 +166,49 @@
             try {
                 let output = '';
                 let totalDeposits = 0;
+                const failedAddresses = [];
 
                 // 分批处理地址
                 for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
                     const batch = addresses.slice(i, i + BATCH_SIZE);
-                    const batchPromises = batch.map(async (address) => {
-                        if (!web3.utils.isAddress(address)) {
-                            return `<p class="error">${address}: 无效地址</p>`;
-                        }
-                        try {
-                            const deposit = await mimaContract.methods.deposits(address).call();
-                            const depositFormatted = Number(web3.utils.fromWei(deposit, 'ether')).toFixed(4);
-                            totalDeposits += Number(depositFormatted);
-                            return `<p class="success">${address}: ${depositFormatted} MIMA</p>`;
-                        } catch (error) {
-                            return `<p class="error">${address}: 获取存款余额失败 - ${error.message}</p>`;
+                    const batchPromises = batch.map(address => fetchDeposit(address));
+                    const batchResults = await Promise.all(batchPromises);
+                    batchResults.forEach(({ address, result, success, balance }) => {
+                        output += result;
+                        if (success) {
+                            totalDeposits += balance;
+                        } else {
+                            failedAddresses.push(address);
                         }
                     });
-                    const batchResults = await Promise.all(batchPromises);
-                    output += batchResults.join('');
-                    // 更新UI
-                    resultDiv.innerHTML = output + (i + BATCH_SIZE < addresses.length ? '<p>正在获取更多余额...</p>' : '');
+                    resultDiv.innerHTML = output + (i + BATCH_SIZE < addresses.length || failedAddresses.length > 0 ? '<p>正在获取更多余额...</p>' : '');
+                    await delay(REQUEST_DELAY);
+                }
+
+                // 重试失败的地址
+                let retryRound = 1;
+                while (failedAddresses.length > 0 && retryRound <= MAX_RETRIES) {
+                    const retryBatch = failedAddresses.splice(0, BATCH_SIZE);
+                    const retryPromises = retryBatch.map(address => fetchDeposit(address));
+                    const retryResults = await Promise.all(retryPromises);
+                    retryResults.forEach(({ address, result, success, balance }) => {
+                        output += result;
+                        if (success) {
+                            totalDeposits += balance;
+                        } else {
+                            failedAddresses.push(address);
+                        }
+                    });
+                    resultDiv.innerHTML = output + (failedAddresses.length > 0 ? `<p>第${retryRound}次重试中...</p>` : '');
+                    await delay(REQUEST_DELAY * 2);
+                    retryRound++;
                 }
 
                 // 添加总存款余额
                 output += `<p class="total">总MIMA存款余额: ${totalDeposits.toFixed(4)} MIMA</p>`;
+                if (failedAddresses.length > 0) {
+                    output += `<p class="error">以下地址仍未查询成功: ${failedAddresses.join(', ')}</p>`;
+                }
                 resultDiv.innerHTML = output;
             } catch (error) {
                 resultDiv.innerHTML = `<p class="error">错误: ${error.message}</p>`;
