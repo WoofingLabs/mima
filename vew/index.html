@@ -81,7 +81,7 @@
             </div>
             <h1 class="font-display text-5xl md:text-7xl mb-6 text-primary text-shadow-glow">MIMA Claim Query</h1>
             <p class="text-xl md:text-2xl text-light-gray max-w-3xl mx-auto mb-10">
-                Query MIMA token migration claim records starting from ID 1 until no more records are found.
+                Query MIMA token migration records starting from ID 1 until no more records are found.
             </p>
             <div class="bg-dark/50 p-6 rounded-lg border border-primary/30 max-w-2xl mx-auto mb-8">
                 <div class="flex flex-col space-y-4">
@@ -104,12 +104,19 @@
 
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
     <script>
-        const CONTRACT_ADDRESS = '0x4FF02E12B616453e1534F59eB044a81ADfFe7DdF';
-        const contractAbi = [
+        const OLD_CONTRACT_ADDRESS = '0x4FF02E12B616453e1534F59eB044a81ADfFe7DdF';
+        const NEW_CONTRACT_ADDRESS = '0x6796D46FB31552E6F089421518646bfaC5eCf661';
+
+        const oldContractAbi = [
             {"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getClaimRecord","outputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"claimAmount","type":"uint256"},{"internalType":"uint256","name":"recordId","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"getClaimRecords","outputs":[{"components":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"claimAmount","type":"uint256"},{"internalType":"uint256","name":"id","type":"uint256"}],"internalType":"struct MIMAClaimRegistry.ClaimInfo[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasJoined","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"addressToId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+        ];
+
+        const newContractAbi = [
+            {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getClaimableAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
         ];
 
         const chains = {
@@ -119,11 +126,12 @@
             }
         };
 
-        let web3, migrationContract;
+        let web3, oldContract, newContract;
 
         async function initializeWeb3() {
             web3 = new Web3(chains.GateLayer.rpcUrl);
-            migrationContract = new web3.eth.Contract(contractAbi, CONTRACT_ADDRESS);
+            oldContract = new web3.eth.Contract(oldContractAbi, OLD_CONTRACT_ADDRESS);
+            newContract = new web3.eth.Contract(newContractAbi, NEW_CONTRACT_ADDRESS);
         }
 
         async function delay(ms) {
@@ -160,10 +168,20 @@
                 let id = 1;
                 while (true) {
                     try {
-                        const record = await migrationContract.methods.getClaimRecord(id).call();
+                        const record = await oldContract.methods.getClaimRecord(id).call();
                         const claimAmountFormatted = Number(web3.utils.fromWei(record.claimAmount, 'ether')).toFixed(4);
-                        const isJoined = await migrationContract.methods.hasJoined(record.user).call();
-                        const statusColor = isJoined ? 'text-red-500' : 'text-green-500';
+                        const isJoined = await oldContract.methods.hasJoined(record.user).call();
+                        let hasClaimed = false;
+                        let claimableNewMima = '0';
+                        try {
+                            hasClaimed = await newContract.methods.hasClaimed(record.user).call();
+                            claimableNewMima = await newContract.methods.getClaimableAmount(record.user).call();
+                        } catch (error) {
+                            hasClaimed = false;
+                            claimableNewMima = '0';
+                        }
+                        const claimableNewMimaFormatted = Number(web3.utils.fromWei(claimableNewMima, 'ether')).toFixed(4);
+                        const statusColor = hasClaimed ? 'text-red-500' : 'text-green-500';
                         queryResults.innerHTML += `
                             <div class="p-2 border-b border-primary/20">
                                 <p class="text-sm">
@@ -175,8 +193,9 @@
                                             <i class="fa fa-copy"></i>
                                         </button>
                                     </div>
-                                    <span class="${statusColor}">Claimed: ${isJoined ? 'Yes' : 'No'}</span><br>
-                                    <span>Claim Amount: ${claimAmountFormatted} MIMA</span>
+                                    <span>Joined: ${isJoined ? 'Yes' : 'No'}</span><br>
+                                    <span class="${statusColor}">Claimed: ${hasClaimed ? 'Yes' : 'No'}</span><br>
+                                    <span>Claimable New MIMA: ${claimableNewMimaFormatted}</span>
                                 </p>
                             </div>
                         `;
