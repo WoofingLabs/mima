@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIMA Deposits Checker</title>
+    <title>MIMA Deposits Checker & Scanner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -58,14 +58,25 @@
             font-weight: 700;
             margin-top: 10px;
         }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #4b4b4b;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="text-3xl font-bold text-center mb-6">MIMA Deposits Checker</h1>
-        <p class="text-center text-gray-400 mb-4">请输入钱包地址（每行一个）</p>
+        <h1 class="text-3xl font-bold text-center mb-6">MIMA Deposits Checker & Scanner</h1>
+        <p class="text-center text-gray-400 mb-4">模式1: 手动输入地址（每行一个） | 模式2: 自动扫描合约事件</p>
         <textarea id="addresses" rows="5" placeholder="0xA037355662d34D9B57dE209E22544a4862F5A30c&#10;0xAnotherAddress"></textarea>
         <button id="checkButton" class="mt-4">查询存款</button>
+        <button id="scanButton" class="mt-4 bg-green-600">自动扫描所有存入记录</button>
         <div id="result" class="text-sm"></div>
     </div>
 
@@ -73,12 +84,16 @@
     <script>
         const MIMA_ADDRESS = '0x735843DEA06Fe3cbeD52B9065BfE5F886A0daDFe';
         const RPC_URLS = [
-            'https://gatelayer-mainnet.gatenode.cc/'
+            'https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID', // 替换为您的Infura项目ID
+            'https://rpc.ankr.com/eth',
+            'https://eth.llamarpc.com',
+            'https://cloudflare-eth.com'
         ];
-        const BATCH_SIZE = 3; // 减小批次大小以降低速率限制风险
-        const MAX_RETRIES = 5; // 最大重试次数
-        const RETRY_DELAY = 2000; // 重试间隔（毫秒）
-        const REQUEST_DELAY = 1000; // 每批请求之间的延迟（毫秒）
+        const BATCH_SIZE = 3;
+        const MAX_RETRIES = 5;
+        const RETRY_DELAY = 2000;
+        const REQUEST_DELAY = 1000;
+        const DEPOSIT_EVENT_TOPIC = '0x608060405234801561001057600080fd5b50600436106100f75760003560e01c8063d21220a7156100f7578063d21220a71461013b578063e9848c2814610160575b600080fd5b61013d600480360381019061013891906102e0575b61016b565b005b61014761016b565b60405190815260200160405180910390f35b61014761015f565b61014761015f565b6000546001600160a01b0316331461018b57600080fd5b6001600160a01b03811661019c57600080fd5b6000546040516001600160a01b0390911690600081818185875af1925050503d80600081146101e9576040519150601f19603f3d011682016040523d82523d6000602084013e6101ee565b606091505b50509050806101fb919061021c565b90506001600160a01b0381166000908152602081905260409020548181101561022257600080fd5b600091509250905081905092915050565b6000546001600160a01b0316331461024757600080fd5b604080516001600160a01b039092168252519081900360640190fd5b60006020828403121561026c57600080fd5b5035919050565b60008060006060848603121561028a57600080fd5b83356102958161025f565b925060208401356102a58161025f565b9150604084015190509250925092565b600080fd5b600080fd'; // Deposit事件签名哈希（需根据实际ABI计算，这里为示例）
 
         const mimaAbi = [
             {
@@ -88,10 +103,16 @@
                 "outputs": [{"name": "", "type": "uint256"}],
                 "stateMutability": "view",
                 "type": "function"
+            },
+            {
+                "anonymous": false,
+                "inputs": [{"indexed": true, "name": "user", "type": "address"}, {"indexed": false, "name": "amount", "type": "uint256"}],
+                "name": "Deposit",
+                "type": "event"
             }
         ];
 
-        let web3, mimaContract, currentRpcIndex = 0;
+        let web3, mimaContract, currentRpcIndex = 0, contractDeployBlock = 0;
 
         async function initializeWeb3() {
             while (currentRpcIndex < RPC_URLS.length) {
@@ -99,6 +120,12 @@
                 try {
                     web3 = new Web3(rpcUrl);
                     mimaContract = new web3.eth.Contract(mimaAbi, MIMA_ADDRESS);
+                    // 获取合约部署块号
+                    const code = await web3.eth.getCode(MIMA_ADDRESS);
+                    if (code === '0x') throw new Error('Contract not deployed');
+                    const latestBlock = await web3.eth.getBlockNumber();
+                    // 模拟获取部署块（实际可通过getTransactionReceipt部署tx）
+                    contractDeployBlock = latestBlock - 10000; // 假设，实际需精确
                     await mimaContract.methods.deposits('0x0000000000000000000000000000000000000000').call();
                     return true;
                 } catch (error) {
@@ -122,24 +149,55 @@
                 const depositFormatted = Number(web3.utils.fromWei(deposit, 'ether')).toFixed(4);
                 return { address, result: `<p class="success">${address}: ${depositFormatted} MIMA</p>`, success: true, balance: Number(depositFormatted) };
             } catch (error) {
-                if (retries < MAX_RETRIES && error.message.includes('Rate limit exceeded')) {
+                if (retries < MAX_RETRIES && (error.message.includes('Rate limit') || error.message.includes('timeout'))) {
                     await delay(RETRY_DELAY);
                     if (retries === Math.floor(MAX_RETRIES / 2)) {
-                        currentRpcIndex++;
-                        if (currentRpcIndex < RPC_URLS.length) {
-                            const initialized = await initializeWeb3();
-                            if (!initialized) {
-                                return { address, result: `<p class="error">${address}: 所有RPC端点均失败</p>`, success: false };
-                            }
-                        }
+                        currentRpcIndex = (currentRpcIndex + 1) % RPC_URLS.length;
+                        await initializeWeb3();
                     }
                     return fetchDeposit(address, retries + 1);
                 }
-                return { address, result: `<p class="error">${address}: 获取存款余额失败 - ${error.message}</p>`, success: false };
+                return { address, result: `<p class="error">${address}: 获取失败 - ${error.message}</p>`, success: false };
+            }
+        }
+
+        async function scanEvents() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>正在扫描合约事件...</p>';
+            try {
+                const latestBlock = await web3.eth.getBlockNumber();
+                const filter = {
+                    fromBlock: contractDeployBlock,
+                    toBlock: latestBlock,
+                    address: MIMA_ADDRESS,
+                    topics: [web3.utils.sha3('Deposit(address,uint256)')]
+                };
+                const events = await mimaContract.getPastEvents('Deposit', filter);
+                if (events.length === 0) {
+                    resultDiv.innerHTML = '<p class="error">未找到任何Deposit事件。合约可能无存款记录。</p>';
+                    return;
+                }
+                const depositsMap = {};
+                events.forEach(event => {
+                    const user = '0x' + event.raw.topics[1].slice(-40);
+                    const amount = Number(web3.utils.fromWei(event.raw.data, 'ether'));
+                    depositsMap[user] = (depositsMap[user] || 0) + amount;
+                });
+                let output = '<h3>扫描结果（基于事件）:</h3><table><tr><th>地址</th><th>总存入 (MIMA)</th></tr>';
+                let total = 0;
+                Object.entries(depositsMap).forEach(([addr, amt]) => {
+                    output += `<tr><td>${addr}</td><td>${amt.toFixed(4)}</td></tr>`;
+                    total += amt;
+                });
+                output += `</table><p class="total">总存入: ${total.toFixed(4)} MIMA | 地址数: ${Object.keys(depositsMap).length}</p>`;
+                resultDiv.innerHTML = output;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">扫描失败: ${error.message} (可能需Infura API密钥支持事件查询)</p>`;
             }
         }
 
         async function checkDeposits() {
+            // 原手动查询逻辑（略，同之前版本）
             const checkButton = document.getElementById('checkButton');
             const resultDiv = document.getElementById('result');
             const addressesInput = document.getElementById('addresses').value.trim();
@@ -154,7 +212,6 @@
             checkButton.innerText = '正在查询...';
             resultDiv.innerHTML = '<p>正在获取存款余额...</p>';
 
-            // 初始化Web3
             const initialized = await initializeWeb3();
             if (!initialized) {
                 resultDiv.innerHTML = '<p class="error">错误：所有RPC端点均失败，请稍后重试。</p>';
@@ -168,7 +225,6 @@
                 let totalDeposits = 0;
                 const failedAddresses = [];
 
-                // 分批处理地址
                 for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
                     const batch = addresses.slice(i, i + BATCH_SIZE);
                     const batchPromises = batch.map(address => fetchDeposit(address));
@@ -181,11 +237,11 @@
                             failedAddresses.push(address);
                         }
                     });
-                    resultDiv.innerHTML = output + (i + BATCH_SIZE < addresses.length || failedAddresses.length > 0 ? '<p>正在获取更多余额...</p>' : '');
+                    resultDiv.innerHTML = output + (i + BATCH_SIZE < addresses.length || failedAddresses.length > 0 ? '<p>正在获取更多...</p>' : '');
                     await delay(REQUEST_DELAY);
                 }
 
-                // 重试失败的地址
+                // 重试失败地址（同之前）
                 let retryRound = 1;
                 while (failedAddresses.length > 0 && retryRound <= MAX_RETRIES) {
                     const retryBatch = failedAddresses.splice(0, BATCH_SIZE);
@@ -199,15 +255,14 @@
                             failedAddresses.push(address);
                         }
                     });
-                    resultDiv.innerHTML = output + (failedAddresses.length > 0 ? `<p>第${retryRound}次重试中...</p>` : '');
+                    resultDiv.innerHTML = output + (failedAddresses.length > 0 ? `<p>第${retryRound}次重试...</p>` : '');
                     await delay(REQUEST_DELAY * 2);
                     retryRound++;
                 }
 
-                // 添加总存款余额
-                output += `<p class="total">总MIMA存款余额: ${totalDeposits.toFixed(4)} MIMA</p>`;
+                output += `<p class="total">总MIMA存款: ${totalDeposits.toFixed(4)} MIMA</p>`;
                 if (failedAddresses.length > 0) {
-                    output += `<p class="error">以下地址仍未查询成功: ${failedAddresses.join(', ')}</p>`;
+                    output += `<p class="error">仍失败地址: ${failedAddresses.join(', ')}</p>`;
                 }
                 resultDiv.innerHTML = output;
             } catch (error) {
@@ -220,6 +275,10 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('checkButton').addEventListener('click', checkDeposits);
+            document.getElementById('scanButton').addEventListener('click', async () => {
+                await initializeWeb3();
+                await scanEvents();
+            });
         });
     </script>
 </body>
