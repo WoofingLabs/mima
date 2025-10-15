@@ -169,6 +169,21 @@
             throw new Error(`Transaction ${txHash} not confirmed after ${maxAttempts} attempts`);
         }
 
+        async function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function retryContractCall(fn, maxRetries = 3, delayMs = 500) {
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    if (attempt === maxRetries) throw error;
+                    await delay(delayMs);
+                }
+            }
+        }
+
         async function initializeWeb3() {
             if (window.ethereum) {
                 web3 = new Web3(window.ethereum);
@@ -228,12 +243,18 @@
                 return;
             }
             try {
-                const gtBalance = await web3.eth.getBalance(account);
-                const mimaDeposits = await migrationContract.methods.deposits(account).call();
+                document.getElementById('networkStatus').innerText = 'Querying balances...';
+                const gtBalance = await retryContractCall(() => web3.eth.getBalance(account));
+                await delay(500);
+                const mimaDeposits = await retryContractCall(() => migrationContract.methods.deposits(account).call());
+                await delay(500);
                 const claimableNewMima = web3.utils.toBN(mimaDeposits).mul(web3.utils.toBN(75)).div(web3.utils.toBN(100));
-                const mimaNewBalance = await mimaNewContract.methods.balanceOf(account).call();
-                const contractMimaNew = await mimaNewContract.methods.balanceOf(CONTRACT_ADDRESS).call();
-                const hasClaimed = await migrationContract.methods.hasClaimed(account).call();
+                await delay(500);
+                const mimaNewBalance = await retryContractCall(() => mimaNewContract.methods.balanceOf(account).call());
+                await delay(500);
+                const contractMimaNew = await retryContractCall(() => mimaNewContract.methods.balanceOf(CONTRACT_ADDRESS).call());
+                await delay(500);
+                const hasClaimed = await retryContractCall(() => migrationContract.methods.hasClaimed(account).call());
                 const gtBalanceFormatted = Number(web3.utils.fromWei(gtBalance, 'ether')).toFixed(4);
                 const mimaDepositsFormatted = Number(web3.utils.fromWei(mimaDeposits, 'ether')).toFixed(4);
                 const claimableNewMimaFormatted = Number(web3.utils.fromWei(claimableNewMima, 'ether')).toFixed(4);
@@ -241,10 +262,11 @@
                 const contractMimaNewFormatted = Number(web3.utils.fromWei(contractMimaNew, 'ether')).toFixed(4);
                 document.getElementById('balanceStatus').innerHTML = `GT Balance: ${gtBalanceFormatted}<br>Old MIMA Deposits: ${mimaDepositsFormatted}<br>Claimable New MIMA: ${claimableNewMimaFormatted}<br>New MIMA Balance: ${mimaNewBalanceFormatted}<br>Contract New MIMA: ${contractMimaNewFormatted}<br>Claimed: ${hasClaimed ? 'Yes' : 'No'}`;
                 document.getElementById('claimButton').disabled = hasClaimed || Number(mimaDepositsFormatted) <= 0;
-                const owner = await migrationContract.methods.owner().call();
+                const owner = await retryContractCall(() => migrationContract.methods.owner().call());
+                await delay(500);
                 if (account.toLowerCase() === owner.toLowerCase()) {
                     document.getElementById('ownerSection').classList.remove('hidden');
-                    const mimaNewOwnerBalance = await mimaNewContract.methods.balanceOf(account).call();
+                    const mimaNewOwnerBalance = await retryContractCall(() => mimaNewContract.methods.balanceOf(account).call());
                     const mimaNewOwnerBalanceFormatted = Number(web3.utils.fromWei(mimaNewOwnerBalance, 'ether')).toFixed(4);
                     document.getElementById('maxDepositButton').dataset.maxAmount = mimaNewOwnerBalanceFormatted;
                     document.getElementById('maxDepositButton').disabled = Number(mimaNewOwnerBalanceFormatted) <= 0;
@@ -252,11 +274,23 @@
                 } else {
                     document.getElementById('ownerSection').classList.add('hidden');
                 }
+                document.getElementById('networkStatus').innerText = 'Balances updated';
             } catch (error) {
-                document.getElementById('balanceStatus').innerHTML = `Query failed: ${error.message}`;
+                let errorMessage = error.message || 'Unknown error';
+                if (errorMessage.includes('execution reverted')) {
+                    if (errorMessage.includes('No deposits')) {
+                        errorMessage = 'No old MIMA deposits found';
+                    } else if (errorMessage.includes('Already claimed')) {
+                        errorMessage = 'You have already claimed';
+                    } else {
+                        errorMessage = 'Contract query failed, please check network or contract';
+                    }
+                }
+                document.getElementById('balanceStatus').innerHTML = `Query failed: ${errorMessage}`;
                 document.getElementById('claimButton').disabled = true;
                 document.getElementById('depositNewButton').disabled = true;
                 document.getElementById('maxDepositButton').disabled = true;
+                document.getElementById('networkStatus').innerText = errorMessage;
             }
         }
 
@@ -372,7 +406,21 @@
                 status.innerText = 'Claimed new MIMA successfully!';
                 await checkBalances();
             } catch (error) {
-                status.innerText = error.code === 4001 ? 'User cancelled transaction' : `Claim failed: ${error.message}`;
+                let errorMessage = error.message || 'Unknown error';
+                if (errorMessage.includes('execution reverted')) {
+                    if (errorMessage.includes('Already claimed')) {
+                        errorMessage = 'You have already claimed';
+                    } else if (errorMessage.includes('No deposits')) {
+                        errorMessage = 'No old MIMA deposits found';
+                    } else if (errorMessage.includes('Insufficient new tokens')) {
+                        errorMessage = 'Contract has insufficient new MIMA';
+                    } else {
+                        errorMessage = 'Claim failed, please check contract';
+                    }
+                } else if (error.code === 4001) {
+                    errorMessage = 'User cancelled transaction';
+                }
+                status.innerText = errorMessage;
             } finally {
                 claimButton.disabled = false;
                 claimButton.innerHTML = 'Claim New MIMA';
