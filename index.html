@@ -81,7 +81,7 @@
             </div>
             <h1 class="font-display text-5xl md:text-7xl mb-6 text-primary text-shadow-glow">MIMA Token Migration</h1>
             <p class="text-xl md:text-2xl text-light-gray max-w-3xl mx-auto mb-10">
-                Claim your new MIMA tokens based on your old MIMA deposits.
+                Claim your new MIMA tokens (75% of old MIMA deposits).
             </p>
             <div class="bg-dark/50 p-6 rounded-lg border border-primary/30 max-w-md mx-auto mb-8">
                 <div class="flex flex-col space-y-4">
@@ -95,7 +95,7 @@
                         </button>
                     </div>
                     <div class="bg-dark/80 p-3 rounded-lg border border-primary/20">
-                        <p id="balanceStatus" class="text-light-gray text-sm">GT Balance: 0<br>Old MIMA Deposits: 0<br>New MIMA Balance: 0<br>Contract New MIMA: 0<br>Claimed: No</p>
+                        <p id="balanceStatus" class="text-light-gray text-sm">GT Balance: 0<br>Old MIMA Deposits: 0<br>Claimable New MIMA: 0<br>New MIMA Balance: 0<br>Contract New MIMA: 0<br>Claimed: No</p>
                     </div>
                     <div id="ownerSection" class="hidden">
                         <label class="block text-left text-light-gray mb-2">Deposit New MIMA Amount</label>
@@ -138,7 +138,8 @@
             {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"depositNewTokens","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[],"name":"claim","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"deposits","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
+            {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"}
         ];
 
         const chains = {
@@ -224,22 +225,25 @@
                 document.getElementById('claimButton').disabled = true;
                 document.getElementById('depositNewButton').disabled = true;
                 document.getElementById('maxDepositButton').disabled = true;
-                document.getElementById('balanceStatus').innerHTML = 'GT Balance: 0<br>Old MIMA Deposits: 0<br>New MIMA Balance: 0<br>Contract New MIMA: 0<br>Claimed: No';
+                document.getElementById('balanceStatus').innerHTML = 'GT Balance: 0<br>Old MIMA Deposits: 0<br>Claimable New MIMA: 0<br>New MIMA Balance: 0<br>Contract New MIMA: 0<br>Claimed: No';
                 return;
             }
             try {
                 const gtBalance = await web3.eth.getBalance(account);
                 const mimaDeposits = await migrationContract.methods.deposits(account).call();
+                const claimableNewMima = web3.utils.toBN(mimaDeposits).mul(web3.utils.toBN(75)).div(web3.utils.toBN(100));
                 const mimaNewBalance = await mimaNewContract.methods.balanceOf(account).call();
                 const contractMimaNew = await mimaNewContract.methods.balanceOf(CONTRACT_ADDRESS).call();
                 const hasClaimed = await migrationContract.methods.hasClaimed(account).call();
                 const gtBalanceFormatted = Number(web3.utils.fromWei(gtBalance, 'ether')).toFixed(4);
                 const mimaDepositsFormatted = Number(web3.utils.fromWei(mimaDeposits, 'ether')).toFixed(4);
+                const claimableNewMimaFormatted = Number(web3.utils.fromWei(claimableNewMima, 'ether')).toFixed(4);
                 const mimaNewBalanceFormatted = Number(web3.utils.fromWei(mimaNewBalance, 'ether')).toFixed(4);
                 const contractMimaNewFormatted = Number(web3.utils.fromWei(contractMimaNew, 'ether')).toFixed(4);
-                document.getElementById('balanceStatus').innerHTML = `GT Balance: ${gtBalanceFormatted}<br>Old MIMA Deposits: ${mimaDepositsFormatted}<br>New MIMA Balance: ${mimaNewBalanceFormatted}<br>Contract New MIMA: ${contractMimaNewFormatted}<br>Claimed: ${hasClaimed ? 'Yes' : 'No'}`;
+                document.getElementById('balanceStatus').innerHTML = `GT Balance: ${gtBalanceFormatted}<br>Old MIMA Deposits: ${mimaDepositsFormatted}<br>Claimable New MIMA: ${claimableNewMimaFormatted}<br>New MIMA Balance: ${mimaNewBalanceFormatted}<br>Contract New MIMA: ${contractMimaNewFormatted}<br>Claimed: ${hasClaimed ? 'Yes' : 'No'}`;
                 document.getElementById('claimButton').disabled = hasClaimed || Number(mimaDepositsFormatted) <= 0;
-                if (account.toLowerCase() === OWNER_ADDRESS.toLowerCase()) {
+                const owner = await migrationContract.methods.owner().call();
+                if (account.toLowerCase() === owner.toLowerCase()) {
                     document.getElementById('ownerSection').classList.remove('hidden');
                     const mimaNewOwnerBalance = await mimaNewContract.methods.balanceOf(account).call();
                     const mimaNewOwnerBalanceFormatted = Number(web3.utils.fromWei(mimaNewOwnerBalance, 'ether')).toFixed(4);
