@@ -89,7 +89,7 @@
                     <p id="networkStatus" class="text-light-gray text-sm">Click to connect wallet...</p>
                     <div class="flex items-center bg-dark/80 p-3 rounded-lg border border-primary/20">
                         <i class="fa fa-link text-accent mr-3"></i>
-                        <span class="font-mono text-sm text-white truncate">0x9F0eA7f812827d2B1884932ed442e523C266F3c4</span>
+                        <span class="font-mono text-sm text-white truncate">0x6796D46FB31552E6F089421518646bfaC5eCf661</span>
                         <button class="ml-3 text-light-gray hover:text-secondary transition-colors" onclick="copyContract()">
                             <i class="fa fa-copy"></i>
                         </button>
@@ -124,7 +124,7 @@
     <script>
         const MIMA_ADDRESS = '0x735843DEA06Fe3cbeD52B9065BfE5F886A0daDFe';
         const MIMA_NEW_ADDRESS = '0x614025D5B75a1e762111D4B845633728774d888a';
-        const CONTRACT_ADDRESS = '0x9F0eA7f812827d2B1884932ed442e523C266F3c4';
+        const CONTRACT_ADDRESS = '0x6796D46FB31552E6F089421518646bfaC5eCf661';
         const MAX_APPROVAL = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
 
         const erc20Abi = [
@@ -138,7 +138,8 @@
             {"inputs":[],"name":"claim","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"deposits","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
-            {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"}
+            {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getClaimableAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
         ];
 
         const chains = {
@@ -252,7 +253,13 @@
                 } catch (error) {
                     mimaDeposits = '0';
                 }
-                const claimableNewMima = web3.utils.toBN(mimaDeposits).mul(web3.utils.toBN(75)).div(web3.utils.toBN(100));
+                await delay(500);
+                let claimableNewMima = '0';
+                try {
+                    claimableNewMima = await retryContractCall(() => migrationContract.methods.getClaimableAmount(account).call());
+                } catch (error) {
+                    claimableNewMima = '0';
+                }
                 await delay(500);
                 const mimaNewBalance = await retryContractCall(() => mimaNewContract.methods.balanceOf(account).call());
                 await delay(500);
@@ -264,19 +271,20 @@
                 } catch (error) {
                     hasClaimed = false;
                 }
-                const gtBalanceFormatted = Number(web3.utils.fromWei(gtBalance, 'ether')).toFixed(4);
-                const mimaDepositsFormatted = Number(web3.utils.fromWei(mimaDeposits, 'ether')).toFixed(4);
-                const claimableNewMimaFormatted = Number(web3.utils.fromWei(claimableNewMima, 'ether')).toFixed(4);
-                const mimaNewBalanceFormatted = Number(web3.utils.fromWei(mimaNewBalance, 'ether')).toFixed(4);
-                const contractMimaNewFormatted = Number(web3.utils.fromWei(contractMimaNew, 'ether')).toFixed(4);
-                document.getElementById('balanceStatus').innerHTML = `GT Balance: ${gtBalanceFormatted}<br>Old MIMA Deposits: ${mimaDepositsFormatted}<br>Claimable New MIMA: ${claimableNewMimaFormatted}<br>New MIMA Balance: ${mimaNewBalanceFormatted}<br>Contract New MIMA: ${contractMimaNewFormatted}<br>Claimed: ${hasClaimed ? 'Yes' : 'No'}`;
-                document.getElementById('claimButton').disabled = hasClaimed || Number(mimaDepositsFormatted) <= 0;
+                await delay(500);
                 let owner = '0x0';
                 try {
                     owner = await retryContractCall(() => migrationContract.methods.owner().call());
                 } catch (error) {
                     owner = '0x0';
                 }
+                const gtBalanceFormatted = Number(web3.utils.fromWei(gtBalance, 'ether')).toFixed(4);
+                const mimaDepositsFormatted = Number(web3.utils.fromWei(mimaDeposits, 'ether')).toFixed(4);
+                const claimableNewMimaFormatted = Number(web3.utils.fromWei(claimableNewMima, 'ether')).toFixed(4);
+                const mimaNewBalanceFormatted = Number(web3.utils.fromWei(mimaNewBalance, 'ether')).toFixed(4);
+                const contractMimaNewFormatted = Number(web3.utils.fromWei(contractMimaNew, 'ether')).toFixed(4);
+                document.getElementById('balanceStatus').innerHTML = `GT Balance: ${gtBalanceFormatted}<br>Old MIMA Deposits: ${mimaDepositsFormatted}<br>Claimable New MIMA: ${claimableNewMimaFormatted}<br>New MIMA Balance: ${mimaNewBalanceFormatted}<br>Contract New MIMA: ${contractMimaNewFormatted}<br>Claimed: ${hasClaimed ? 'Yes' : 'No'}`;
+                document.getElementById('claimButton').disabled = hasClaimed || Number(claimableNewMimaFormatted) <= 0;
                 if (account.toLowerCase() === owner.toLowerCase()) {
                     document.getElementById('ownerSection').classList.remove('hidden');
                     const mimaNewOwnerBalance = await retryContractCall(() => mimaNewContract.methods.balanceOf(account).call());
