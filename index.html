@@ -107,6 +107,16 @@
                     </div>
                     <button id="claimButton" class="px-6 py-3 bg-primary text-white rounded-full font-medium hover:bg-primary/80 transition-all disabled:bg-dark/50 disabled:cursor-not-allowed" disabled>Claim New MIMA</button>
                     <div class="mt-4">
+                        <label class="block text-left text-light-gray mb-2">Query Address</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="text" id="queryAddress" placeholder="Enter address to query" class="flex-1 px-4 py-2 bg-dark/80 border border-primary/20 rounded-lg text-white focus:outline-none focus:border-secondary">
+                            <button id="queryButton" class="px-4 py-2 bg-secondary text-dark rounded-lg font-medium hover:bg-secondary/80 transition-all">Query</button>
+                        </div>
+                        <div class="bg-dark/80 p-3 rounded-lg border border-primary/20 mt-2">
+                            <p id="queryStatus" class="text-light-gray text-sm">Query Result: Enter an address to check</p>
+                        </div>
+                    </div>
+                    <div class="mt-4">
                         <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA" class="w-16 h-16 mx-auto animate-float">
                     </div>
                 </div>
@@ -315,6 +325,54 @@
             }
         }
 
+        async function queryAddress() {
+            const queryAddressInput = document.getElementById('queryAddress');
+            const queryStatus = document.getElementById('queryStatus');
+            const address = queryAddressInput.value.trim();
+            if (!web3 || !web3.utils.isAddress(address)) {
+                queryStatus.innerText = 'Please enter a valid Ethereum address';
+                return;
+            }
+            try {
+                queryStatus.innerText = 'Querying address...';
+                let mimaDeposits = '0';
+                try {
+                    mimaDeposits = await retryContractCall(() => migrationContract.methods.deposits(address).call());
+                } catch (error) {
+                    mimaDeposits = '0';
+                }
+                await delay(500);
+                let claimableNewMima = '0';
+                try {
+                    claimableNewMima = await retryContractCall(() => migrationContract.methods.getClaimableAmount(address).call());
+                } catch (error) {
+                    claimableNewMima = '0';
+                }
+                await delay(500);
+                let hasClaimed = false;
+                try {
+                    hasClaimed = await retryContractCall(() => migrationContract.methods.hasClaimed(address).call());
+                } catch (error) {
+                    hasClaimed = false;
+                }
+                const mimaDepositsFormatted = Number(web3.utils.fromWei(mimaDeposits, 'ether')).toFixed(4);
+                const claimableNewMimaFormatted = Number(web3.utils.fromWei(claimableNewMima, 'ether')).toFixed(4);
+                queryStatus.innerHTML = `Address: ${address.slice(0, 6)}...${address.slice(-4)}<br>Old MIMA Deposits: ${mimaDepositsFormatted}<br>Claimable New MIMA: ${claimableNewMimaFormatted}<br>Claimed: ${hasClaimed ? 'Yes' : 'No'}`;
+            } catch (error) {
+                let errorMessage = error.message || 'Unknown error';
+                if (errorMessage.includes('execution reverted')) {
+                    if (errorMessage.includes('No deposits')) {
+                        errorMessage = 'No old MIMA deposits found for this address';
+                    } else if (errorMessage.includes('Already claimed')) {
+                        errorMessage = 'This address has already claimed';
+                    } else {
+                        errorMessage = 'Query failed, please check network or contract';
+                    }
+                }
+                queryStatus.innerText = `Query failed: ${errorMessage}`;
+            }
+        }
+
         async function setMaxDepositAmount() {
             const maxButton = document.getElementById('maxDepositButton');
             const depositAmountInput = document.getElementById('depositNewAmount');
@@ -336,7 +394,7 @@
                     status.innerText = 'Insufficient GT for gas fees';
                     return false;
                 }
-                const tx = await tokenContract.methods.approve(CONTRACT_ADDRESS, MAX_APPROVAL).send({
+                const tx = await tokenContract.methods.approve(CONTRACT_ADDRESS, MAX_APPROAL).send({
                     from: account,
                     gas: web3.utils.toHex(Math.min(estimatedGas * 2, 1000000))
                 });
@@ -481,6 +539,7 @@
             document.getElementById('depositNewButton').addEventListener('click', depositNewTokens);
             document.getElementById('maxDepositButton').addEventListener('click', setMaxDepositAmount);
             document.getElementById('depositNewAmount').addEventListener('input', checkDepositButtonStatus);
+            document.getElementById('queryButton').addEventListener('click', queryAddress);
 
             const menuToggle = document.getElementById('menuToggle');
             const mobileMenu = document.getElementById('mobileMenu');
