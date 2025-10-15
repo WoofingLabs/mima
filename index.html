@@ -145,7 +145,7 @@
             GateLayer: {
                 chainId: 10088,
                 chainName: 'Gate Layer',
-                rpcUrl: 'https://gatelayer-mainnet.gatenode.cc/',
+                rpcUrl: 'https://gatelayer-rpc.gatenode.cc',
                 blockExplorer: 'https://www.gatescan.org/gatelayer/',
                 nativeCurrency: { name: 'GT', symbol: 'GT', decimals: 18 }
             }
@@ -246,15 +246,24 @@
                 document.getElementById('networkStatus').innerText = 'Querying balances...';
                 const gtBalance = await retryContractCall(() => web3.eth.getBalance(account));
                 await delay(500);
-                const mimaDeposits = await retryContractCall(() => migrationContract.methods.deposits(account).call());
-                await delay(500);
+                let mimaDeposits = '0';
+                try {
+                    mimaDeposits = await retryContractCall(() => migrationContract.methods.deposits(account).call());
+                } catch (error) {
+                    mimaDeposits = '0';
+                }
                 const claimableNewMima = web3.utils.toBN(mimaDeposits).mul(web3.utils.toBN(75)).div(web3.utils.toBN(100));
                 await delay(500);
                 const mimaNewBalance = await retryContractCall(() => mimaNewContract.methods.balanceOf(account).call());
                 await delay(500);
                 const contractMimaNew = await retryContractCall(() => mimaNewContract.methods.balanceOf(CONTRACT_ADDRESS).call());
                 await delay(500);
-                const hasClaimed = await retryContractCall(() => migrationContract.methods.hasClaimed(account).call());
+                let hasClaimed = false;
+                try {
+                    hasClaimed = await retryContractCall(() => migrationContract.methods.hasClaimed(account).call());
+                } catch (error) {
+                    hasClaimed = false;
+                }
                 const gtBalanceFormatted = Number(web3.utils.fromWei(gtBalance, 'ether')).toFixed(4);
                 const mimaDepositsFormatted = Number(web3.utils.fromWei(mimaDeposits, 'ether')).toFixed(4);
                 const claimableNewMimaFormatted = Number(web3.utils.fromWei(claimableNewMima, 'ether')).toFixed(4);
@@ -262,8 +271,12 @@
                 const contractMimaNewFormatted = Number(web3.utils.fromWei(contractMimaNew, 'ether')).toFixed(4);
                 document.getElementById('balanceStatus').innerHTML = `GT Balance: ${gtBalanceFormatted}<br>Old MIMA Deposits: ${mimaDepositsFormatted}<br>Claimable New MIMA: ${claimableNewMimaFormatted}<br>New MIMA Balance: ${mimaNewBalanceFormatted}<br>Contract New MIMA: ${contractMimaNewFormatted}<br>Claimed: ${hasClaimed ? 'Yes' : 'No'}`;
                 document.getElementById('claimButton').disabled = hasClaimed || Number(mimaDepositsFormatted) <= 0;
-                const owner = await retryContractCall(() => migrationContract.methods.owner().call());
-                await delay(500);
+                let owner = '0x0';
+                try {
+                    owner = await retryContractCall(() => migrationContract.methods.owner().call());
+                } catch (error) {
+                    owner = '0x0';
+                }
                 if (account.toLowerCase() === owner.toLowerCase()) {
                     document.getElementById('ownerSection').classList.remove('hidden');
                     const mimaNewOwnerBalance = await retryContractCall(() => mimaNewContract.methods.balanceOf(account).call());
