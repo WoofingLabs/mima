@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MIMA Token Migration Query</title>
+    <link rel="icon" type="image/png" href="https://www.woofswap.finance/image/tokens/mima.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0068FF',
+                        secondary: '#18E5A0',
+                        accent: '#FFD700',
+                        dark: '#070808',
+                        'light-gray': '#E5E7EB'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        display: ['Changa One', 'system-ui', 'sans-serif']
+                    },
+                    animation: {
+                        'float': 'float 3s ease-in-out infinite'
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-8px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow-glow {
+                text-shadow: 0 0 10px rgba(0, 104, 255, 0.5);
+            }
+            .glow-border {
+                box-shadow: 0 0 12px rgba(24, 229, 160, 0.3);
+            }
+            .bg-grid {
+                background-image: url('data:image/svg+xml,%3Csvg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"%3E%3Ccircle cx="1" cy="1" r="1" fill="%230068FF" fill-opacity="0.1"/%3E%3C/svg%3E');
+                background-size: 20px 20px;
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=Changa+One&display=swap" rel="stylesheet">
+</head>
+<body class="bg-dark text-white font-sans overflow-x-hidden">
+    <header class="fixed w-full z-50 bg-dark/90 backdrop-blur-md transition-all duration-300" id="navbar">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3 cursor-pointer hover:text-primary transition-colors">
+                <div class="w-10 h-10 rounded-full overflow-hidden">
+                    <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA Logo" class="w-full h-full object-cover">
+                </div>
+                <span class="font-display text-3xl text-primary text-shadow-glow">MIMA Token Migration Query</span>
+            </div>
+            <button id="menuToggle" class="md:hidden text-2xl text-primary">
+                <i class="fa fa-bars"></i>
+            </button>
+        </div>
+        <div id="mobileMenu" class="md:hidden bg-dark/95 absolute w-full top-full py-4 px-4 hidden">
+            <div class="flex flex-col space-y-4">
+                <a href="#migration" class="hover:text-primary transition-colors py-2 text-white">Query Records</a>
+            </div>
+        </div>
+    </header>
+
+    <section id="migration" class="min-h-screen pt-24 pb-16 bg-grid relative overflow-hidden flex items-center justify-center">
+        <div class="absolute inset-0 bg-gradient-to-b from-primary/10 to-dark pointer-events-none"></div>
+        <div class="absolute top-0 left-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 right-0 w-80 h-80 bg-secondary/10 rounded-full blur-3xl"></div>
+        <div class="container mx-auto px-4 text-center relative z-10">
+            <div class="w-48 h-48 mx-auto mb-8 animate-float">
+                <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA Logo" class="w-full h-full object-cover rounded-full border-4 border-secondary/50 glow-border">
+            </div>
+            <h1 class="font-display text-5xl md:text-7xl mb-6 text-primary text-shadow-glow">MIMA Token Migration Query</h1>
+            <p class="text-xl md:text-2xl text-light-gray max-w-3xl mx-auto mb-10">
+                View the claim status for MIMA token migration (75% of old MIMA deposits).
+            </p>
+            <div class="bg-dark/50 p-6 rounded-lg border border-primary/30 max-w-4xl mx-auto mb-8">
+                <div class="flex flex-col space-y-4">
+                    <p id="networkStatus" class="text-light-gray text-sm">Connecting to Gate Layer...</p>
+                    <div class="flex items-center bg-dark/80 p-3 rounded-lg border border-primary/20">
+                        <i class="fa fa-link text-accent mr-3"></i>
+                        <span class="font-mono text-sm text-white truncate">0x6796D46FB31552E6F089421518646bfaC5eCf661</span>
+                        <button class="ml-3 text-light-gray hover:text-secondary transition-colors" onclick="copyContract()">
+                            <i class="fa fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="bg-dark/80 p-3 rounded-lg border border-primary/20">
+                        <p id="recordStatus" class="text-light-gray text-sm">Loading records...</p>
+                        <div id="recordList" class="mt-4 text-left"></div>
+                    </div>
+                    <div class="mt-4">
+                        <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA" class="w-16 h-16 mx-auto animate-float">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-dark/95 py-12 border-t border-primary/20">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-light-gray text-sm">© 2025 MIMA. All rights reserved. DYOR and invest responsibly.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
+    <script>
+        const CONTRACT_ADDRESS = '0x6796D46FB31552E6F089421518646bfaC5eCf661';
+
+        const contractAbi = [
+            {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getClaimableAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
+        ];
+
+        const chains = {
+            GateLayer: {
+                chainId: 10088,
+                chainName: 'Gate Layer',
+                rpcUrl: 'https://gatelayer-rpc.gatenode.cc',
+                blockExplorer: 'https://www.gatescan.org/gatelayer/',
+                nativeCurrency: { name: 'GT', symbol: 'GT', decimals: 18 }
+            }
+        };
+
+        let web3, migrationContract;
+
+        async function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function retryContractCall(fn, maxRetries = 3, delayMs = 500) {
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    if (attempt === maxRetries) return null;
+                    await delay(delayMs);
+                }
+            }
+        }
+
+        async function initializeWeb3() {
+            try {
+                web3 = new Web3(chains.GateLayer.rpcUrl);
+                migrationContract = new web3.eth.Contract(contractAbi, CONTRACT_ADDRESS);
+                document.getElementById('networkStatus').innerText = 'Connected to Gate Layer (ID: 10088)';
+                await loadRecords();
+            } catch (error) {
+                document.getElementById('networkStatus').innerText = 'Failed to connect to Gate Layer: ' + (error.message || 'Unknown error');
+                document.getElementById('recordStatus').innerText = 'Failed to load records';
+            }
+        }
+
+        async function loadRecords() {
+            const status = document.getElementById('networkStatus');
+            const recordStatus = document.getElementById('recordStatus');
+            const recordList = document.getElementById('recordList');
+            try {
+                status.innerText = 'Querying records...';
+                recordStatus.innerText = 'Loading records...';
+                
+                // 示例地址列表（需替换为实际数据源或事件日志）
+                const addresses = [
+                    '0x1234567890123456789012345678901234567890',
+                    '0xabcdef1234567890abcdef1234567890abcdef12',
+                    // 添加更多地址，或通过事件获取
+                ];
+
+                let html = '<table class="w-full text-sm text-light-gray"><thead><tr><th class="text-left py-2">ID</th><th class="text-left py-2">Address</th><th class="text-left py-2">Status</th><th class="text-left py-2">Claimable Amount</th></tr></thead><tbody>';
+                let id = 1;
+                let continueQuery = true;
+
+                while (continueQuery && id <= addresses.length) {
+                    const address = addresses[id - 1];
+                    if (!web3.utils.isAddress(address)) {
+                        html += `<tr><td class="py-2">${id}</td><td class="py-2 font-mono">Invalid Address</td><td class="py-2">N/A</td><td class="py-2">N/A</td></tr>`;
+                        id++;
+                        await delay(1000);
+                        continue;
+                    }
+
+                    let hasClaimed = false;
+                    let claimableAmount = '0';
+                    try {
+                        hasClaimed = await retryContractCall(() => migrationContract.methods.hasClaimed(address).call());
+                        if (hasClaimed === null) throw new Error('Query failed');
+                    } catch (error) {
+                        hasClaimed = false;
+                    }
+                    await delay(500);
+
+                    if (!hasClaimed) {
+                        try {
+                            claimableAmount = await retryContractCall(() => migrationContract.methods.getClaimableAmount(address).call());
+                            if (claimableAmount === null) throw new Error('Query failed');
+                        } catch (error) {
+                            claimableAmount = '0';
+                        }
+                    }
+
+                    const claimableAmountFormatted = Number(web3.utils.fromWei(claimableAmount, 'ether')).toFixed(4);
+                    const addressDisplay = `${address.slice(0, 6)}...${address.slice(-4)}`;
+                    html += `<tr>
+                        <td class="py-2">${id}</td>
+                        <td class="py-2 font-mono ${hasClaimed ? 'text-red-500' : 'text-white'}">${addressDisplay}</td>
+                        <td class="py-2">${hasClaimed ? 'Claimed' : 'Not Claimed'}</td>
+                        <td class="py-2">${hasClaimed ? 'N/A' : claimableAmountFormatted}</td>
+                    </tr>`;
+
+                    recordList.innerHTML = html;
+                    if (!hasClaimed && claimableAmount === '0') {
+                        continueQuery = false; // 停止条件：未领取且可领取数量为0
+                    }
+
+                    id++;
+                    await delay(1000); // 每秒查询一个
+                }
+
+                html += '</tbody></table>';
+                recordList.innerHTML = html;
+                recordStatus.innerText = continueQuery ? 'Reached address list end' : 'No more records found';
+                status.innerText = 'Records loaded';
+            } catch (error) {
+                let errorMessage = error.message || 'Unknown error';
+                if (errorMessage.includes('execution reverted')) {
+                    if (errorMessage.includes('No deposits')) {
+                        errorMessage = 'No deposits found for this address';
+                    } else {
+                        errorMessage = 'Query failed, please check contract';
+                    }
+                }
+                recordStatus.innerText = `Failed to load records: ${errorMessage}`;
+                status.innerText = 'Query failed';
+            }
+        }
+
+        function copyContract() {
+            navigator.clipboard.writeText(CONTRACT_ADDRESS).then(() => {
+                const notification = document.createElement('div');
+                notification.className = 'fixed bottom-4 right-4 bg-primary text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                notification.textContent = 'Contract address copied!';
+                document.body.appendChild(notification);
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    notification.style.transition = 'opacity 0.3s';
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 300);
+                }, 2000);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeWeb3();
+
+            const menuToggle = document.getElementById('menuToggle');
+            const mobileMenu = document.getElementById('mobileMenu');
+            menuToggle.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+                menuToggle.innerHTML = mobileMenu.classList.contains('hidden')
+                    ? '<i class="fa fa-bars"></i>'
+                    : '<i class="fa fa-times"></i>';
+            });
+
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    mobileMenu.classList.add('hidden');
+                    menuToggle.innerHTML = '<i class="fa fa-bars"></i>';
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+
+            const navbar = document.getElementById('navbar');
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 50) {
+                    navbar.classList.add('bg-dark/95', 'shadow-lg');
+                } else {
+                    navbar.classList.remove('bg-dark/95', 'shadow-lg');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
