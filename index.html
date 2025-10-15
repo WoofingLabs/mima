@@ -2,282 +2,441 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIMA Deposits Checker & Scanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MIMA Token Migration</title>
+    <link rel="icon" type="image/png" href="https://www.woofswap.finance/image/tokens/mima.png">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #1a1a1a;
-            color: #ffffff;
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0068FF',
+                        secondary: '#18E5A0',
+                        accent: '#FFD700',
+                        dark: '#070808',
+                        'light-gray': '#E5E7EB'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        display: ['Changa One', 'system-ui', 'sans-serif']
+                    },
+                    animation: {
+                        'float': 'float 3s ease-in-out infinite'
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-8px)' }
+                        }
+                    }
+                }
+            }
         }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        textarea, button {
-            width: 100%;
-            padding: 10px;
-            border-radius: 8px;
-        }
-        textarea {
-            background-color: #2d2d2d;
-            border: 1px solid #4b4b4b;
-            color: #ffffff;
-            resize: vertical;
-        }
-        button {
-            background-color: #0068FF;
-            color: #ffffff;
-            border: none;
-            font-weight: 700;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #0052cc;
-        }
-        button:disabled {
-            background-color: #4b4b4b;
-            cursor: not-allowed;
-        }
-        #result {
-            margin-top: 20px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .error {
-            color: #ff4d4d;
-        }
-        .success {
-            color: #18E5A0;
-        }
-        .total {
-            font-weight: 700;
-            margin-top: 10px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        th, td {
-            padding: 8px;
-            text-align: left;
-            border-bottom: 1px solid #4b4b4b;
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow-glow {
+                text-shadow: 0 0 10px rgba(0, 104, 255, 0.5);
+            }
+            .glow-border {
+                box-shadow: 0 0 12px rgba(24, 229, 160, 0.3);
+            }
+            .bg-grid {
+                background-image: url('data:image/svg+xml,%3Csvg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"%3E%3Ccircle cx="1" cy="1" r="1" fill="%230068FF" fill-opacity="0.1"/%3E%3C/svg%3E');
+                background-size: 20px 20px;
+            }
         }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=Changa+One&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div class="container">
-        <h1 class="text-3xl font-bold text-center mb-6">MIMA Deposits Checker & Scanner</h1>
-        <p class="text-center text-gray-400 mb-4">模式1: 手动输入地址（每行一个） | 模式2: 自动扫描合约事件</p>
-        <textarea id="addresses" rows="5" placeholder="0xA037355662d34D9B57dE209E22544a4862F5A30c&#10;0xAnotherAddress"></textarea>
-        <button id="checkButton" class="mt-4">查询存款</button>
-        <button id="scanButton" class="mt-4 bg-green-600">自动扫描所有存入记录</button>
-        <div id="result" class="text-sm"></div>
-    </div>
+<body class="bg-dark text-white font-sans overflow-x-hidden">
+    <header class="fixed w-full z-50 bg-dark/90 backdrop-blur-md transition-all duration-300" id="navbar">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3 cursor-pointer hover:text-primary transition-colors">
+                <div class="w-10 h-10 rounded-full overflow-hidden">
+                    <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA Logo" class="w-full h-full object-cover">
+                </div>
+                <span class="font-display text-3xl text-primary text-shadow-glow">MIMA Token Migration</span>
+            </div>
+            <button id="menuToggle" class="md:hidden text-2xl text-primary">
+                <i class="fa fa-bars"></i>
+            </button>
+        </div>
+        <div id="mobileMenu" class="md:hidden bg-dark/95 absolute w-full top-full py-4 px-4 hidden">
+            <div class="flex flex-col space-y-4">
+                <a href="#migration" class="hover:text-primary transition-colors py-2 text-white">Token Migration</a>
+            </div>
+        </div>
+    </header>
+
+    <section id="migration" class="min-h-screen pt-24 pb-16 bg-grid relative overflow-hidden flex items-center justify-center">
+        <div class="absolute inset-0 bg-gradient-to-b from-primary/10 to-dark pointer-events-none"></div>
+        <div class="absolute top-0 left-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 right-0 w-80 h-80 bg-secondary/10 rounded-full blur-3xl"></div>
+        <div class="container mx-auto px-4 text-center relative z-10">
+            <div class="w-48 h-48 mx-auto mb-8 animate-float">
+                <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA Logo" class="w-full h-full object-cover rounded-full border-4 border-secondary/50 glow-border">
+            </div>
+            <h1 class="font-display text-5xl md:text-7xl mb-6 text-primary text-shadow-glow">MIMA Token Migration</h1>
+            <p class="text-xl md:text-2xl text-light-gray max-w-3xl mx-auto mb-10">
+                Claim your new MIMA tokens based on your old MIMA deposits.
+            </p>
+            <div class="bg-dark/50 p-6 rounded-lg border border-primary/30 max-w-md mx-auto mb-8">
+                <div class="flex flex-col space-y-4">
+                    <button id="connectWalletButton" class="px-6 py-3 bg-primary text-white rounded-full font-medium hover:bg-primary/80 transition-all">Connect Wallet</button>
+                    <p id="networkStatus" class="text-light-gray text-sm">Click to connect wallet...</p>
+                    <div class="flex items-center bg-dark/80 p-3 rounded-lg border border-primary/20">
+                        <i class="fa fa-link text-accent mr-3"></i>
+                        <span class="font-mono text-sm text-white truncate">0x9F0eA7f812827d2B1884932ed442e523C266F3c4</span>
+                        <button class="ml-3 text-light-gray hover:text-secondary transition-colors" onclick="copyContract()">
+                            <i class="fa fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="bg-dark/80 p-3 rounded-lg border border-primary/20">
+                        <p id="balanceStatus" class="text-light-gray text-sm">GT Balance: 0<br>Old MIMA Deposits: 0<br>New MIMA Balance: 0<br>Contract New MIMA: 0<br>Claimed: No</p>
+                    </div>
+                    <div id="ownerSection" class="hidden">
+                        <label class="block text-left text-light-gray mb-2">Deposit New MIMA Amount</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="text" id="depositNewAmount" placeholder="Enter amount in new MIMA" class="flex-1 px-4 py-2 bg-dark/80 border border-primary/20 rounded-lg text-white focus:outline-none focus:border-secondary">
+                            <button id="maxDepositButton" class="px-4 py-2 bg-secondary text-dark rounded-lg font-medium hover:bg-secondary/80 transition-all disabled:bg-dark/50 disabled:cursor-not-allowed" disabled>Max</button>
+                        </div>
+                        <button id="depositNewButton" class="mt-4 px-6 py-3 bg-primary text-white rounded-full font-medium hover:bg-primary/80 transition-all disabled:bg-dark/50 disabled:cursor-not-allowed" disabled>Deposit New MIMA</button>
+                    </div>
+                    <button id="claimButton" class="px-6 py-3 bg-primary text-white rounded-full font-medium hover:bg-primary/80 transition-all disabled:bg-dark/50 disabled:cursor-not-allowed" disabled>Claim New MIMA</button>
+                    <div class="mt-4">
+                        <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA" class="w-16 h-16 mx-auto animate-float">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-dark/95 py-12 border-t border-primary/20">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-light-gray text-sm">© 2025 MIMA. All rights reserved. DYOR and invest responsibly.</p>
+        </div>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
     <script>
         const MIMA_ADDRESS = '0x735843DEA06Fe3cbeD52B9065BfE5F886A0daDFe';
-        const RPC_URLS = [
-            'https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID', // 替换为您的Infura项目ID
-            'https://rpc.ankr.com/eth',
-            'https://eth.llamarpc.com',
-            'https://cloudflare-eth.com'
-        ];
-        const BATCH_SIZE = 3;
-        const MAX_RETRIES = 5;
-        const RETRY_DELAY = 2000;
-        const REQUEST_DELAY = 1000;
-        const DEPOSIT_EVENT_TOPIC = '0x608060405234801561001057600080fd5b50600436106100f75760003560e01c8063d21220a7156100f7578063d21220a71461013b578063e9848c2814610160575b600080fd5b61013d600480360381019061013891906102e0575b61016b565b005b61014761016b565b60405190815260200160405180910390f35b61014761015f565b61014761015f565b6000546001600160a01b0316331461018b57600080fd5b6001600160a01b03811661019c57600080fd5b6000546040516001600160a01b0390911690600081818185875af1925050503d80600081146101e9576040519150601f19603f3d011682016040523d82523d6000602084013e6101ee565b606091505b50509050806101fb919061021c565b90506001600160a01b0381166000908152602081905260409020548181101561022257600080fd5b600091509250905081905092915050565b6000546001600160a01b0316331461024757600080fd5b604080516001600160a01b039092168252519081900360640190fd5b60006020828403121561026c57600080fd5b5035919050565b60008060006060848603121561028a57600080fd5b83356102958161025f565b925060208401356102a58161025f565b9150604084015190509250925092565b600080fd5b600080fd'; // Deposit事件签名哈希（需根据实际ABI计算，这里为示例）
+        const MIMA_NEW_ADDRESS = '0x614025D5B75a1e762111D4B845633728774d888a';
+        const CONTRACT_ADDRESS = '0x9F0eA7f812827d2B1884932ed442e523C266F3c4';
+        const MAX_APPROVAL = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
+        const OWNER_ADDRESS = '0x' + '0'.repeat(40); // 替换为实际Owner地址
 
-        const mimaAbi = [
-            {
-                "constant": true,
-                "inputs": [{"name": "", "type": "address"}],
-                "name": "deposits",
-                "outputs": [{"name": "", "type": "uint256"}],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "anonymous": false,
-                "inputs": [{"indexed": true, "name": "user", "type": "address"}, {"indexed": false, "name": "amount", "type": "uint256"}],
-                "name": "Deposit",
-                "type": "event"
+        const erc20Abi = [
+            {"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"constant":true,"inputs":[{"name":"_owner","type":"address"},{"name":"_spender","type":"address"}],"name":"allowance","outputs":[{"name":"remaining","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[{"name":"success","type":"bool"}],"stateMutability":"nonpayable","type":"function"}
+        ];
+
+        const contractAbi = [
+            {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"depositNewTokens","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"claim","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"deposits","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
+        ];
+
+        const chains = {
+            GateLayer: {
+                chainId: 10088,
+                chainName: 'Gate Layer',
+                rpcUrl: 'https://gatelayer-rpc.gatenode.cc',
+                blockExplorer: 'https://www.gatescan.org/gatelayer/',
+                nativeCurrency: { name: 'GT', symbol: 'GT', decimals: 18 }
             }
-        ];
+        };
 
-        let web3, mimaContract, currentRpcIndex = 0, contractDeployBlock = 0;
+        let web3, account, mimaContract, mimaNewContract, migrationContract;
+
+        async function waitForTransaction(txHash) {
+            let receipt = null;
+            const maxAttempts = 30;
+            let attempts = 0;
+            while (attempts < maxAttempts) {
+                receipt = await web3.eth.getTransactionReceipt(txHash);
+                if (receipt) {
+                    if (receipt.status) return receipt;
+                    throw new Error(`Transaction ${txHash} failed`);
+                }
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                attempts++;
+            }
+            throw new Error(`Transaction ${txHash} not confirmed after ${maxAttempts} attempts`);
+        }
 
         async function initializeWeb3() {
-            while (currentRpcIndex < RPC_URLS.length) {
-                const rpcUrl = RPC_URLS[currentRpcIndex];
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
                 try {
-                    web3 = new Web3(rpcUrl);
-                    mimaContract = new web3.eth.Contract(mimaAbi, MIMA_ADDRESS);
-                    // 获取合约部署块号
-                    const code = await web3.eth.getCode(MIMA_ADDRESS);
-                    if (code === '0x') throw new Error('Contract not deployed');
-                    const latestBlock = await web3.eth.getBlockNumber();
-                    // 模拟获取部署块（实际可通过getTransactionReceipt部署tx）
-                    contractDeployBlock = latestBlock - 10000; // 假设，实际需精确
-                    await mimaContract.methods.deposits('0x0000000000000000000000000000000000000000').call();
-                    return true;
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    account = (await web3.eth.getAccounts())[0];
+                    document.getElementById('connectWalletButton').innerText = `Connected: ${account.slice(0, 6)}...${account.slice(-4)}`;
+                    await switchNetwork('GateLayer');
+                    await initializeContracts();
+                    await checkBalances();
+                    document.getElementById('networkStatus').innerText = 'Connected to Gate Layer (ID: 10088)';
                 } catch (error) {
-                    console.warn(`RPC ${rpcUrl} failed: ${error.message}`);
-                    currentRpcIndex++;
+                    document.getElementById('networkStatus').innerText = 'Wallet connection failed: ' + (error.message || 'Unknown error');
+                }
+            } else {
+                document.getElementById('networkStatus').innerText = 'Please install MetaMask';
+            }
+        }
+
+        async function switchNetwork(chain) {
+            const chainConfig = chains[chain];
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: `0x${chainConfig.chainId.toString(16)}` }]
+                });
+            } catch (switchError) {
+                if (switchError.code === 4902) {
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [{
+                            chainId: `0x${chainConfig.chainId.toString(16)}`,
+                            chainName: chainConfig.chainName,
+                            rpcUrls: [chainConfig.rpcUrl],
+                            nativeCurrency: chainConfig.nativeCurrency,
+                            blockExplorerUrls: [chainConfig.blockExplorer]
+                        }]
+                    });
+                } else {
+                    throw switchError;
                 }
             }
-            return false;
         }
 
-        async function delay(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
+        async function initializeContracts() {
+            mimaContract = new web3.eth.Contract(erc20Abi, MIMA_ADDRESS);
+            mimaNewContract = new web3.eth.Contract(erc20Abi, MIMA_NEW_ADDRESS);
+            migrationContract = new web3.eth.Contract(contractAbi, CONTRACT_ADDRESS);
         }
 
-        async function fetchDeposit(address, retries = 0) {
-            if (!web3.utils.isAddress(address)) {
-                return { address, result: `<p class="error">${address}: 无效地址</p>`, success: false };
+        async function checkBalances() {
+            if (!web3 || !account) {
+                document.getElementById('claimButton').disabled = true;
+                document.getElementById('depositNewButton').disabled = true;
+                document.getElementById('maxDepositButton').disabled = true;
+                document.getElementById('balanceStatus').innerHTML = 'GT Balance: 0<br>Old MIMA Deposits: 0<br>New MIMA Balance: 0<br>Contract New MIMA: 0<br>Claimed: No';
+                return;
             }
             try {
-                const deposit = await mimaContract.methods.deposits(address).call();
-                const depositFormatted = Number(web3.utils.fromWei(deposit, 'ether')).toFixed(4);
-                return { address, result: `<p class="success">${address}: ${depositFormatted} MIMA</p>`, success: true, balance: Number(depositFormatted) };
+                const gtBalance = await web3.eth.getBalance(account);
+                const mimaDeposits = await migrationContract.methods.deposits(account).call();
+                const mimaNewBalance = await mimaNewContract.methods.balanceOf(account).call();
+                const contractMimaNew = await mimaNewContract.methods.balanceOf(CONTRACT_ADDRESS).call();
+                const hasClaimed = await migrationContract.methods.hasClaimed(account).call();
+                const gtBalanceFormatted = Number(web3.utils.fromWei(gtBalance, 'ether')).toFixed(4);
+                const mimaDepositsFormatted = Number(web3.utils.fromWei(mimaDeposits, 'ether')).toFixed(4);
+                const mimaNewBalanceFormatted = Number(web3.utils.fromWei(mimaNewBalance, 'ether')).toFixed(4);
+                const contractMimaNewFormatted = Number(web3.utils.fromWei(contractMimaNew, 'ether')).toFixed(4);
+                document.getElementById('balanceStatus').innerHTML = `GT Balance: ${gtBalanceFormatted}<br>Old MIMA Deposits: ${mimaDepositsFormatted}<br>New MIMA Balance: ${mimaNewBalanceFormatted}<br>Contract New MIMA: ${contractMimaNewFormatted}<br>Claimed: ${hasClaimed ? 'Yes' : 'No'}`;
+                document.getElementById('claimButton').disabled = hasClaimed || Number(mimaDepositsFormatted) <= 0;
+                if (account.toLowerCase() === OWNER_ADDRESS.toLowerCase()) {
+                    document.getElementById('ownerSection').classList.remove('hidden');
+                    const mimaNewOwnerBalance = await mimaNewContract.methods.balanceOf(account).call();
+                    const mimaNewOwnerBalanceFormatted = Number(web3.utils.fromWei(mimaNewOwnerBalance, 'ether')).toFixed(4);
+                    document.getElementById('maxDepositButton').dataset.maxAmount = mimaNewOwnerBalanceFormatted;
+                    document.getElementById('maxDepositButton').disabled = Number(mimaNewOwnerBalanceFormatted) <= 0;
+                    checkDepositButtonStatus();
+                } else {
+                    document.getElementById('ownerSection').classList.add('hidden');
+                }
             } catch (error) {
-                if (retries < MAX_RETRIES && (error.message.includes('Rate limit') || error.message.includes('timeout'))) {
-                    await delay(RETRY_DELAY);
-                    if (retries === Math.floor(MAX_RETRIES / 2)) {
-                        currentRpcIndex = (currentRpcIndex + 1) % RPC_URLS.length;
-                        await initializeWeb3();
-                    }
-                    return fetchDeposit(address, retries + 1);
-                }
-                return { address, result: `<p class="error">${address}: 获取失败 - ${error.message}</p>`, success: false };
+                document.getElementById('balanceStatus').innerHTML = `Query failed: ${error.message}`;
+                document.getElementById('claimButton').disabled = true;
+                document.getElementById('depositNewButton').disabled = true;
+                document.getElementById('maxDepositButton').disabled = true;
             }
         }
 
-        async function scanEvents() {
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = '<p>正在扫描合约事件...</p>';
+        async function setMaxDepositAmount() {
+            const maxButton = document.getElementById('maxDepositButton');
+            const depositAmountInput = document.getElementById('depositNewAmount');
+            if (maxButton.dataset.maxAmount && Number(maxButton.dataset.maxAmount) > 0) {
+                depositAmountInput.value = Math.floor(Number(maxButton.dataset.maxAmount));
+                checkDepositButtonStatus();
+            }
+        }
+
+        async function approveToken(tokenContract) {
+            const status = document.getElementById('networkStatus');
             try {
-                const latestBlock = await web3.eth.getBlockNumber();
-                const filter = {
-                    fromBlock: contractDeployBlock,
-                    toBlock: latestBlock,
-                    address: MIMA_ADDRESS,
-                    topics: [web3.utils.sha3('Deposit(address,uint256)')]
-                };
-                const events = await mimaContract.getPastEvents('Deposit', filter);
-                if (events.length === 0) {
-                    resultDiv.innerHTML = '<p class="error">未找到任何Deposit事件。合约可能无存款记录。</p>';
+                status.innerText = 'Approving new MIMA...';
+                const gasPrice = await web3.eth.getGasPrice();
+                const estimatedGas = await tokenContract.methods.approve(CONTRACT_ADDRESS, MAX_APPROVAL).estimateGas({ from: account });
+                const nativeBalance = await web3.eth.getBalance(account);
+                const gasCost = web3.utils.toBN(gasPrice).mul(web3.utils.toBN(estimatedGas));
+                if (web3.utils.toBN(nativeBalance).lt(gasCost)) {
+                    status.innerText = 'Insufficient GT for gas fees';
+                    return false;
+                }
+                const tx = await tokenContract.methods.approve(CONTRACT_ADDRESS, MAX_APPROVAL).send({
+                    from: account,
+                    gas: web3.utils.toHex(Math.min(estimatedGas * 2, 1000000))
+                });
+                await waitForTransaction(tx.transactionHash);
+                status.innerText = 'New MIMA approval successful!';
+                return true;
+            } catch (error) {
+                status.innerText = error.code === 4001 ? 'User cancelled approval' : `Approval failed: ${error.message}`;
+                return false;
+            }
+        }
+
+        async function depositNewTokens() {
+            const status = document.getElementById('networkStatus');
+            const depositButton = document.getElementById('depositNewButton');
+            const amount = document.getElementById('depositNewAmount').value.trim();
+            if (!web3 || !account) {
+                status.innerText = 'Please connect wallet';
+                return;
+            }
+            if (!amount || isNaN(amount) || Number(amount) <= 0) {
+                status.innerText = 'Enter a valid new MIMA amount';
+                return;
+            }
+            try {
+                depositButton.disabled = true;
+                depositButton.innerHTML = 'Depositing... <i class="fa fa-spinner fa-spin ml-2"></i>';
+                status.innerText = 'Checking balance and gas...';
+                const amountWei = web3.utils.toWei(amount, 'ether');
+                const mimaNewBalance = await mimaNewContract.methods.balanceOf(account).call();
+                if (web3.utils.toBN(mimaNewBalance).lt(web3.utils.toBN(amountWei))) {
+                    status.innerText = 'Insufficient new MIMA balance';
                     return;
                 }
-                const depositsMap = {};
-                events.forEach(event => {
-                    const user = '0x' + event.raw.topics[1].slice(-40);
-                    const amount = Number(web3.utils.fromWei(event.raw.data, 'ether'));
-                    depositsMap[user] = (depositsMap[user] || 0) + amount;
+                const allowance = await mimaNewContract.methods.allowance(account, CONTRACT_ADDRESS).call();
+                if (web3.utils.toBN(allowance).lt(web3.utils.toBN(amountWei))) {
+                    const approved = await approveToken(mimaNewContract);
+                    if (!approved) return;
+                }
+                const gasPrice = await web3.eth.getGasPrice();
+                const estimatedGas = await migrationContract.methods.depositNewTokens(amountWei).estimateGas({ from: account });
+                const nativeBalance = await web3.eth.getBalance(account);
+                const gasCost = web3.utils.toBN(gasPrice).mul(web3.utils.toBN(estimatedGas));
+                if (web3.utils.toBN(nativeBalance).lt(gasCost)) {
+                    status.innerText = 'Insufficient GT for gas fees';
+                    return;
+                }
+                const tx = await migrationContract.methods.depositNewTokens(amountWei).send({
+                    from: account,
+                    gas: web3.utils.toHex(Math.min(estimatedGas * 2, 3000000))
                 });
-                let output = '<h3>扫描结果（基于事件）:</h3><table><tr><th>地址</th><th>总存入 (MIMA)</th></tr>';
-                let total = 0;
-                Object.entries(depositsMap).forEach(([addr, amt]) => {
-                    output += `<tr><td>${addr}</td><td>${amt.toFixed(4)}</td></tr>`;
-                    total += amt;
-                });
-                output += `</table><p class="total">总存入: ${total.toFixed(4)} MIMA | 地址数: ${Object.keys(depositsMap).length}</p>`;
-                resultDiv.innerHTML = output;
+                await waitForTransaction(tx.transactionHash);
+                status.innerText = `Deposited ${amount} new MIMA successfully!`;
+                document.getElementById('depositNewAmount').value = '';
+                await checkBalances();
             } catch (error) {
-                resultDiv.innerHTML = `<p class="error">扫描失败: ${error.message} (可能需Infura API密钥支持事件查询)</p>`;
+                status.innerText = error.code === 4001 ? 'User cancelled transaction' : `Deposit failed: ${error.message}`;
+            } finally {
+                depositButton.disabled = false;
+                depositButton.innerHTML = 'Deposit New MIMA';
             }
         }
 
-        async function checkDeposits() {
-            // 原手动查询逻辑（略，同之前版本）
-            const checkButton = document.getElementById('checkButton');
-            const resultDiv = document.getElementById('result');
-            const addressesInput = document.getElementById('addresses').value.trim();
-            const addresses = addressesInput.split('\n').map(addr => addr.trim()).filter(addr => addr);
-
-            if (addresses.length === 0) {
-                resultDiv.innerHTML = '<p class="error">请至少输入一个钱包地址。</p>';
+        async function claimTokens() {
+            const status = document.getElementById('networkStatus');
+            const claimButton = document.getElementById('claimButton');
+            if (!web3 || !account) {
+                status.innerText = 'Please connect wallet';
                 return;
             }
-
-            checkButton.disabled = true;
-            checkButton.innerText = '正在查询...';
-            resultDiv.innerHTML = '<p>正在获取存款余额...</p>';
-
-            const initialized = await initializeWeb3();
-            if (!initialized) {
-                resultDiv.innerHTML = '<p class="error">错误：所有RPC端点均失败，请稍后重试。</p>';
-                checkButton.disabled = false;
-                checkButton.innerText = '查询存款';
-                return;
-            }
-
             try {
-                let output = '';
-                let totalDeposits = 0;
-                const failedAddresses = [];
-
-                for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
-                    const batch = addresses.slice(i, i + BATCH_SIZE);
-                    const batchPromises = batch.map(address => fetchDeposit(address));
-                    const batchResults = await Promise.all(batchPromises);
-                    batchResults.forEach(({ address, result, success, balance }) => {
-                        output += result;
-                        if (success) {
-                            totalDeposits += balance;
-                        } else {
-                            failedAddresses.push(address);
-                        }
-                    });
-                    resultDiv.innerHTML = output + (i + BATCH_SIZE < addresses.length || failedAddresses.length > 0 ? '<p>正在获取更多...</p>' : '');
-                    await delay(REQUEST_DELAY);
+                claimButton.disabled = true;
+                claimButton.innerHTML = 'Claiming... <i class="fa fa-spinner fa-spin ml-2"></i>';
+                status.innerText = 'Checking claim eligibility...';
+                const gasPrice = await web3.eth.getGasPrice();
+                const estimatedGas = await migrationContract.methods.claim().estimateGas({ from: account });
+                const nativeBalance = await web3.eth.getBalance(account);
+                const gasCost = web3.utils.toBN(gasPrice).mul(web3.utils.toBN(estimatedGas));
+                if (web3.utils.toBN(nativeBalance).lt(gasCost)) {
+                    status.innerText = 'Insufficient GT for gas fees';
+                    return;
                 }
-
-                // 重试失败地址（同之前）
-                let retryRound = 1;
-                while (failedAddresses.length > 0 && retryRound <= MAX_RETRIES) {
-                    const retryBatch = failedAddresses.splice(0, BATCH_SIZE);
-                    const retryPromises = retryBatch.map(address => fetchDeposit(address));
-                    const retryResults = await Promise.all(retryPromises);
-                    retryResults.forEach(({ address, result, success, balance }) => {
-                        output += result;
-                        if (success) {
-                            totalDeposits += balance;
-                        } else {
-                            failedAddresses.push(address);
-                        }
-                    });
-                    resultDiv.innerHTML = output + (failedAddresses.length > 0 ? `<p>第${retryRound}次重试...</p>` : '');
-                    await delay(REQUEST_DELAY * 2);
-                    retryRound++;
-                }
-
-                output += `<p class="total">总MIMA存款: ${totalDeposits.toFixed(4)} MIMA</p>`;
-                if (failedAddresses.length > 0) {
-                    output += `<p class="error">仍失败地址: ${failedAddresses.join(', ')}</p>`;
-                }
-                resultDiv.innerHTML = output;
+                const tx = await migrationContract.methods.claim().send({
+                    from: account,
+                    gas: web3.utils.toHex(Math.min(estimatedGas * 2, 3000000))
+                });
+                await waitForTransaction(tx.transactionHash);
+                status.innerText = 'Claimed new MIMA successfully!';
+                await checkBalances();
             } catch (error) {
-                resultDiv.innerHTML = `<p class="error">错误: ${error.message}</p>`;
+                status.innerText = error.code === 4001 ? 'User cancelled transaction' : `Claim failed: ${error.message}`;
             } finally {
-                checkButton.disabled = false;
-                checkButton.innerText = '查询存款';
+                claimButton.disabled = false;
+                claimButton.innerHTML = 'Claim New MIMA';
             }
+        }
+
+        function copyContract() {
+            navigator.clipboard.writeText(CONTRACT_ADDRESS).then(() => {
+                const notification = document.createElement('div');
+                notification.className = 'fixed bottom-4 right-4 bg-primary text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                notification.textContent = 'Contract address copied!';
+                document.body.appendChild(notification);
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    notification.style.transition = 'opacity 0.3s';
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 300);
+                }, 2000);
+            });
+        }
+
+        async function checkDepositButtonStatus() {
+            if (!web3 || !account) {
+                document.getElementById('depositNewButton').disabled = true;
+                document.getElementById('maxDepositButton').disabled = true;
+                return;
+            }
+            const depositAmount = document.getElementById('depositNewAmount').value.trim();
+            const isDepositValid = depositAmount && !isNaN(depositAmount) && Number(depositAmount) > 0;
+            document.getElementById('depositNewButton').disabled = !isDepositValid;
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('checkButton').addEventListener('click', checkDeposits);
-            document.getElementById('scanButton').addEventListener('click', async () => {
-                await initializeWeb3();
-                await scanEvents();
+            document.getElementById('connectWalletButton').addEventListener('click', initializeWeb3);
+            document.getElementById('claimButton').addEventListener('click', claimTokens);
+            document.getElementById('depositNewButton').addEventListener('click', depositNewTokens);
+            document.getElementById('maxDepositButton').addEventListener('click', setMaxDepositAmount);
+            document.getElementById('depositNewAmount').addEventListener('input', checkDepositButtonStatus);
+
+            const menuToggle = document.getElementById('menuToggle');
+            const mobileMenu = document.getElementById('mobileMenu');
+            menuToggle.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+                menuToggle.innerHTML = mobileMenu.classList.contains('hidden')
+                    ? '<i class="fa fa-bars"></i>'
+                    : '<i class="fa fa-times"></i>';
+            });
+
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    mobileMenu.classList.add('hidden');
+                    menuToggle.innerHTML = '<i class="fa fa-bars"></i>';
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+
+            const navbar = document.getElementById('navbar');
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 50) {
+                    navbar.classList.add('bg-dark/95', 'shadow-lg');
+                } else {
+                    navbar.classList.remove('bg-dark/95', 'shadow-lg');
+                }
             });
         });
     </script>
