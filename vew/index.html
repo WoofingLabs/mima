@@ -130,6 +130,22 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
+        function copyAddress(address) {
+            navigator.clipboard.writeText(address).then(() => {
+                const notification = document.createElement('div');
+                notification.className = 'fixed bottom-4 right-4 bg-primary text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                notification.textContent = 'Address copied!';
+                document.body.appendChild(notification);
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    notification.style.transition = 'opacity 0.3s';
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 300);
+                }, 2000);
+            });
+        }
+
         async function queryClaimRecords() {
             const queryButton = document.getElementById('queryButton');
             const queryStatus = document.getElementById('queryStatus');
@@ -152,8 +168,14 @@
                             <div class="p-2 border-b border-primary/20">
                                 <p class="text-sm">
                                     <span class="font-mono">ID: ${record.recordId}</span><br>
-                                    <span class="font-mono">Address: ${record.user.slice(0, 6)}...${record.user.slice(-4)}</span><br>
-                                    <span class="${statusColor}">Joined: ${isJoined ? 'Yes' : 'No'}</span><br>
+                                    <div class="flex items-center">
+                                        <i class="fa fa-link text-accent mr-3"></i>
+                                        <span class="font-mono text-white truncate">Address: ${record.user}</span>
+                                        <button class="ml-3 text-light-gray hover:text-secondary transition-colors" onclick="copyAddress('${record.user}')">
+                                            <i class="fa fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <span class="${statusColor}">Claimed: ${isJoined ? 'Yes' : 'No'}</span><br>
                                     <span>Claim Amount: ${claimAmountFormatted} MIMA</span>
                                 </p>
                             </div>
