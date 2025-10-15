@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MIMA Claim Query</title>
+    <title>MIMA 领取查询</title>
     <link rel="icon" type="image/png" href="https://www.woofswap.finance/image/tokens/mima.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
@@ -58,7 +58,7 @@
                 <div class="w-10 h-10 rounded-full overflow-hidden">
                     <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA Logo" class="w-full h-full object-cover">
                 </div>
-                <span class="font-display text-3xl text-primary text-shadow-glow">MIMA Claim Query</span>
+                <span class="font-display text-3xl text-primary text-shadow-glow">MIMA 领取查询</span>
             </div>
             <button id="menuToggle" class="md:hidden text-2xl text-primary">
                 <i class="fa fa-bars"></i>
@@ -66,7 +66,7 @@
         </div>
         <div id="mobileMenu" class="md:hidden bg-dark/95 absolute w-full top-full py-4 px-4 hidden">
             <div class="flex flex-col space-y-4">
-                <a href="#query" class="hover:text-primary transition-colors py-2 text-white">Claim Query</a>
+                <a href="#query" class="hover:text-primary transition-colors py-2 text-white">领取查询</a>
             </div>
         </div>
     </header>
@@ -79,15 +79,18 @@
             <div class="w-48 h-48 mx-auto mb-8 animate-float">
                 <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA Logo" class="w-full h-full object-cover rounded-full border-4 border-secondary/50 glow-border">
             </div>
-            <h1 class="font-display text-5xl md:text-7xl mb-6 text-primary text-shadow-glow">MIMA Claim Query</h1>
+            <h1 class="font-display text-5xl md:text-7xl mb-6 text-primary text-shadow-glow">MIMA 领取查询</h1>
             <p class="text-xl md:text-2xl text-light-gray max-w-3xl mx-auto mb-10">
-                Query MIMA token migration records starting from ID 1 until no more records are found.
+                查询 MIMA 代币迁移记录，从 ID 1 开始直到无记录为止。
             </p>
             <div class="bg-dark/50 p-6 rounded-lg border border-primary/30 max-w-2xl mx-auto mb-8">
                 <div class="flex flex-col space-y-4">
-                    <button id="queryButton" class="px-6 py-3 bg-primary text-white rounded-full font-medium hover:bg-primary/80 transition-all">Start Query</button>
-                    <p id="queryStatus" class="text-light-gray text-sm">Click to start querying...</p>
-                    <div id="queryResults" class="bg-dark/80 p-3 rounded-lg border border-primary/20 max-h-96 overflow-y-auto"></div>
+                    <div class="flex items-center space-x-2">
+                        <button id="queryButton" class="px-6 py-3 bg-primary text-white rounded-full font-medium hover:bg-primary/80 transition-all">开始查询</button>
+                        <button id="copyAllButton" class="px-6 py-3 bg-secondary text-dark rounded-full font-medium hover:bg-secondary/80 transition-all hidden">复制全部</button>
+                    </div>
+                    <p id="queryStatus" class="text-light-gray text-sm">点击开始查询...</p>
+                    <div id="queryResults" class="bg-dark/80 p-3 rounded-lg border border-primary/20 max-h-96 overflow-y-auto text-left text-sm font-mono"></div>
                     <div class="mt-4">
                         <img src="https://www.woofswap.finance/image/tokens/mima.png" alt="MIMA" class="w-16 h-16 mx-auto animate-float">
                     </div>
@@ -98,7 +101,7 @@
 
     <footer class="bg-dark/95 py-12 border-t border-primary/20">
         <div class="container mx-auto px-4 text-center">
-            <p class="text-light-gray text-sm">© 2025 MIMA. All rights reserved. DYOR and invest responsibly.</p>
+            <p class="text-light-gray text-sm">© 2025 MIMA. 版权所有。请自行研究（DYOR）并谨慎投资。</p>
         </div>
     </footer>
 
@@ -126,7 +129,7 @@
             }
         };
 
-        let web3, oldContract, newContract;
+        let web3, oldContract, newContract, allRecords = [];
 
         async function initializeWeb3() {
             web3 = new Web3(chains.GateLayer.rpcUrl);
@@ -138,11 +141,12 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        function copyAddress(address) {
-            navigator.clipboard.writeText(address).then(() => {
+        function copyAllRecords() {
+            const textToCopy = allRecords.map(record => `${record.address},${record.amount}`).join('\n');
+            navigator.clipboard.writeText(textToCopy).then(() => {
                 const notification = document.createElement('div');
                 notification.className = 'fixed bottom-4 right-4 bg-primary text-white px-4 py-2 rounded-lg shadow-lg z-50';
-                notification.textContent = 'Address copied!';
+                notification.textContent = '已复制全部记录！';
                 document.body.appendChild(notification);
                 setTimeout(() => {
                     notification.style.opacity = '0';
@@ -156,12 +160,14 @@
 
         async function queryClaimRecords() {
             const queryButton = document.getElementById('queryButton');
+            const copyAllButton = document.getElementById('copyAllButton');
             const queryStatus = document.getElementById('queryStatus');
             const queryResults = document.getElementById('queryResults');
             queryButton.disabled = true;
-            queryButton.innerHTML = 'Querying... <i class="fa fa-spinner fa-spin ml-2"></i>';
-            queryStatus.innerText = 'Querying claim records...';
+            queryButton.innerHTML = '查询中... <i class="fa fa-spinner fa-spin ml-2"></i>';
+            queryStatus.innerText = '正在查询领取记录...';
             queryResults.innerHTML = '';
+            allRecords = [];
 
             try {
                 await initializeWeb3();
@@ -169,8 +175,6 @@
                 while (true) {
                     try {
                         const record = await oldContract.methods.getClaimRecord(id).call();
-                        const claimAmountFormatted = Number(web3.utils.fromWei(record.claimAmount, 'ether')).toFixed(4);
-                        const isJoined = await oldContract.methods.hasJoined(record.user).call();
                         let hasClaimed = false;
                         let claimableNewMima = '0';
                         try {
@@ -182,45 +186,32 @@
                         }
                         const claimableNewMimaFormatted = Number(web3.utils.fromWei(claimableNewMima, 'ether')).toFixed(4);
                         const statusColor = hasClaimed ? 'text-red-500' : 'text-green-500';
-                        queryResults.innerHTML += `
-                            <div class="p-2 border-b border-primary/20">
-                                <p class="text-sm">
-                                    <span class="font-mono">ID: ${record.recordId}</span><br>
-                                    <div class="flex items-center">
-                                        <i class="fa fa-link text-accent mr-3"></i>
-                                        <span class="font-mono text-white truncate">Address: ${record.user}</span>
-                                        <button class="ml-3 text-light-gray hover:text-secondary transition-colors" onclick="copyAddress('${record.user}')">
-                                            <i class="fa fa-copy"></i>
-                                        </button>
-                                    </div>
-                                    <span>Joined: ${isJoined ? 'Yes' : 'No'}</span><br>
-                                    <span class="${statusColor}">Claimed: ${hasClaimed ? 'Yes' : 'No'}</span><br>
-                                    <span>Claimable New MIMA: ${claimableNewMimaFormatted}</span>
-                                </p>
-                            </div>
-                        `;
+                        queryResults.innerHTML += `<p class="${statusColor}">${record.user},${claimableNewMimaFormatted}</p>`;
+                        allRecords.push({ address: record.user, amount: claimableNewMimaFormatted });
                         await delay(1000); // 1秒间隔，避免网络拥堵
                         id++;
                     } catch (error) {
                         if (error.message.includes('Invalid ID')) {
-                            queryStatus.innerText = `Query completed: ${id - 1} records found`;
+                            queryStatus.innerText = `查询完成：找到 ${id - 1} 条记录`;
                             break;
                         } else {
-                            queryStatus.innerText = `Error at ID ${id}: ${error.message}`;
+                            queryStatus.innerText = `ID ${id} 查询错误：${error.message}`;
                             break;
                         }
                     }
                 }
+                copyAllButton.classList.remove('hidden');
             } catch (error) {
-                queryStatus.innerText = `Failed to initialize: ${error.message}`;
+                queryStatus.innerText = `初始化失败：${error.message}`;
             } finally {
                 queryButton.disabled = false;
-                queryButton.innerHTML = 'Start Query';
+                queryButton.innerHTML = '开始查询';
             }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('queryButton').addEventListener('click', queryClaimRecords);
+            document.getElementById('copyAllButton').addEventListener('click', copyAllRecords);
 
             const menuToggle = document.getElementById('menuToggle');
             const mobileMenu = document.getElementById('mobileMenu');
